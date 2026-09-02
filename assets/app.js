@@ -244,7 +244,9 @@ function workload(open) {
   const un = open.filter(t => !t.assignee).length;
   return '<div class="wl">' + rows.map((r, i) =>
     '<div class="r"><span class="av" style="width:26px;height:26px">' + r.u.initials + '</span>' +
-    '<div><div class="nn">' + esc(r.u.name) + (r.bad ? ' <span class="pri p-P1" style="margin-left:5px">' + r.bad + ' late</span>' : '') + '</div>' +
+    '<div><div class="nn">' + esc(r.u.name) +
+      (r.bad ? ' <span class="pri p-P1" style="margin-left:5px">' + r.bad + ' late</span>' : '') +
+      (r.u.available ? '' : ' <span class="pill s-Closed" style="margin-left:5px">' + esc(r.u.why) + '</span>') + '</div>' +
     '<div class="tr" style="margin-top:5px"><i style="width:' + (r.n / max * 100) + '%;animation-delay:' + (i * 55) + 'ms"></i></div></div>' +
     '<span class="vv mono" style="text-align:right">' + r.n + '</span></div>').join('') +
     '</div>' + (un ? '<div class="hint" style="margin-top:12px">' + un + ' unassigned, sitting in the New queue</div>' : '');
@@ -455,7 +457,10 @@ function workForm(t) {
     '</div></div>';
 }
 function actions(t) {
-  const opts = AGENTS.map(a => '<option value="' + a.id + '"' + (t.assignee === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>').join('');
+  const opts = AGENTS.map(a => '<option value="' + a.id + '"' +
+      (t.assignee === a.id ? ' selected' : '') +
+      (a.available ? '' : ' disabled') + '>' + esc(a.name) +
+      (a.available ? '' : ' — ' + a.why) + '</option>').join('');
   let h = '<div class="frm">';
   if (isOpen(t)) {
     h += '<label><span class="lbl">Owner</span><select id="asg"><option value="">— nobody —</option>' + opts + '</select></label>' +

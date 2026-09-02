@@ -11,7 +11,9 @@ system for a bus operator, built to be shown in a meeting.
 
 No real data is in this repository. Specifically:
 
-- **Staff** — the seven names are made up. They are not SPTC employees.
+- **Staff** — DataBytes' own placeholder directory, carried over so this
+  screen agrees with the rest of the pitch. Confirmed by the client as dummy
+  names. They are not SPTC employees.
 - **Passengers** — made up, with invented telephone numbers.
 - **Routes** — the numbers and corridors are illustrative. Replace them with
   SPTC's real route list before this is called anything but a demonstration.
@@ -36,6 +38,8 @@ somebody, and being answered inside an agreed time.
   time — leave the page open and they move.
 - **Two jobs, one system.** The Agent / Supervisor switch in the top bar shows
   the same data as an agent sees it and as the Head of Customer Care sees it.
+- **Availability is respected.** An agent recorded as on leave still appears in
+  the workload panel, labelled, but cannot be given a new case.
 - **Audit trail** — every case keeps who did what and when, separating
   internal notes from what was said to the passenger.
 - **Management view** — volumes over 21 days, subject mix, busiest routes,

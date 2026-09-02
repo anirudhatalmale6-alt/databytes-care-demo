@@ -1,10 +1,12 @@
 /* ------------------------------------------------------------------
    SPTC Passenger Care - demo data
    ------------------------------------------------------------------
-   Everything in this file is INVENTED. The staff names, the passenger
-   names and the phone numbers are made up. Route numbers and fleet
-   numbers are illustrative and will need replacing with SPTC's real
-   ones before this is shown as anything other than a demonstration.
+   No real person appears in this file. The staff are DataBytes' own
+   placeholder directory (confirmed by the client as dummy names, not
+   SPTC employees); the passengers and telephone numbers are invented.
+   Route numbers and fleet numbers are illustrative and will need
+   replacing with SPTC's real ones before this is shown as anything
+   other than a demonstration.
 
    Ticket ages are stored as "hours ago", not as fixed dates, so the
    service-level clocks are genuinely running whenever the page is
@@ -16,7 +18,7 @@ const HOUR = 3600 * 1000;
 /* Bumped whenever the seed data changes shape. Anybody who opened an
    earlier build has the old data sitting in their browser storage and
    would otherwise never see the corrections. */
-const SEED_VERSION = 3;
+const SEED_VERSION = 4;
 
 /* --- how quickly each kind of report has to be answered ---------- */
 const PRIORITIES = {
@@ -76,17 +78,29 @@ const ROUTES = [
   { no: '44', name: 'Beau Vallon - Bel Ombre local',       dest: 'Bel Ombre',       mid: 'Beau Vallon' }
 ];
 
-/* --- invented staff ---------------------------------------------- */
+/* --- staff -------------------------------------------------------
+   These are DataBytes' own placeholder people, taken from the staff
+   directory in the demo database, so this screen agrees with anything
+   else shown in the same meeting. Confirmed with the client as dummy
+   names, not real SPTC employees.
+
+   Joanna Freminot is recorded as on leave, and that is not decoration:
+   an agent who is away must not collect new work. The queue will not
+   offer her, and the workload panel says why. It is the sort of thing
+   an operations manager asks about in the first five minutes.        */
 const STAFF = [
-  { id: 'u1', name: 'Marie-Claire Rose',  title: 'Customer Care Agent',       role: 'agent',      initials: 'MR' },
-  { id: 'u2', name: 'Terry Confait',      title: 'Customer Care Agent',       role: 'agent',      initials: 'TC' },
-  { id: 'u3', name: 'Wilna Adrienne',     title: 'Customer Care Agent',       role: 'agent',      initials: 'WA' },
-  { id: 'u4', name: 'Clifford Servina',   title: 'Customer Care Agent',       role: 'agent',      initials: 'CS' },
-  { id: 'u5', name: 'Roselyn Labiche',    title: 'Complaints Desk Supervisor', role: 'supervisor', initials: 'RL' },
-  { id: 'u6', name: 'Bernard Esparon',    title: 'Head of Customer Care',     role: 'supervisor', initials: 'BE' },
-  { id: 'u7', name: 'Gerard Radegonde',   title: 'Route Supervisor',          role: 'ops',        initials: 'GR' }
+  { id: 'u1', name: 'Alvin Servina',    title: 'Customer Care Agent',        role: 'agent',      initials: 'AS', available: true  },
+  { id: 'u2', name: 'Bernard Athanase', title: 'Customer Care Agent',        role: 'agent',      initials: 'BA', available: true  },
+  { id: 'u3', name: 'Tessa Cadeau',     title: 'Customer Care Agent',        role: 'agent',      initials: 'TC', available: true  },
+  { id: 'u4', name: 'Joanna Freminot',  title: 'Customer Care Agent',        role: 'agent',      initials: 'JF', available: false, why: 'on leave' },
+  { id: 'u5', name: 'Régine Vidot',     title: 'Complaints Desk Supervisor', role: 'supervisor', initials: 'RV', available: true  },
+  { id: 'u6', name: 'Terence Bristol',  title: 'Head of Customer Care',      role: 'supervisor', initials: 'TB', available: true  },
+  { id: 'u7', name: 'Clara Mancienne',  title: 'Route Supervisor',           role: 'ops',        initials: 'CM', available: true  },
+  { id: 'u8', name: 'Ronny Adrienne',   title: 'Quality Auditor',            role: 'ops',        initials: 'RA', available: true  }
 ];
 const AGENTS = STAFF.filter(s => s.role === 'agent');
+/* who can actually be given a new case right now */
+const ASSIGNABLE = AGENTS.filter(s => s.available);
 
 /* --- invented passengers ----------------------------------------- */
 /* Seychelles mobile numbers are seven digits beginning with 2, written
@@ -255,7 +269,7 @@ function buildSeed() {
       else if (ageH > 8)               status = r < 0.55 ? 'In progress' : 'Assigned';
       else                             status = r < 0.45 ? 'Assigned' : 'New';
 
-      const assignee = status === 'New' ? null : pick(AGENTS).id;
+      const assignee = status === 'New' ? null : pick(ASSIGNABLE).id;
 
       /* first response: usually inside target, sometimes not        */
       let firstResponseAt = null;
