@@ -18,7 +18,7 @@ const HOUR = 3600 * 1000;
 /* Bumped whenever the seed data changes shape. Anybody who opened an
    earlier build has the old data sitting in their browser storage and
    would otherwise never see the corrections. */
-const SEED_VERSION = 4;
+const SEED_VERSION = 5;
 
 /* --- how quickly each kind of report has to be answered ---------- */
 const PRIORITIES = {
@@ -28,20 +28,46 @@ const PRIORITIES = {
   NA: { code: '-',  label: 'No target', respondH: null, resolveH: null }
 };
 
+/* --- the sections that actually fix things -----------------------
+   A complaint desk does not repair a bus or discipline a driver. It
+   owns the passenger and chases whoever does. So every subject has a
+   section it belongs to, and choosing the subject is what sends it
+   there - the agent does not have to know who deals with what.
+
+   `head` is the person told the moment a case lands. Customer Care
+   keeps the case throughout: the section does the work, but nobody
+   is allowed to hand the passenger away and forget them.            */
+const SECTIONS = [
+  { id: 'care',   name: 'Customer Care',           short: 'Care',      head: 'u6',
+    what: 'Owns the passenger from first contact to closing letter. Keeps the case even when the work is done elsewhere.' },
+  { id: 'ops',    name: 'Operations and Scheduling', short: 'Operations', head: 'u10',
+    what: 'Running boards, timetables, cancellations, duplicate workings, timing reviews.' },
+  { id: 'crew',   name: 'Crew and Conduct',        short: 'Crew',      head: 'u12',
+    what: 'Anything naming a driver or conductor. Identification from the duty roster, interview, retraining, record.' },
+  { id: 'fleet',  name: 'Fleet Engineering',       short: 'Fleet',     head: 'u14',
+    what: 'Vehicle defects, roadworthiness, anything that takes a bus off the road.' },
+  { id: 'infra',  name: 'Stops and Shelters',      short: 'Infra',     head: 'u7',
+    what: 'Bus stops, shelters, lighting, timetable boards and the pavement around them.' },
+  { id: 'fin',    name: 'Finance and Fares',       short: 'Finance',   head: 'u15',
+    what: 'Fare disputes, refunds, reconciliation against the conductor float.' },
+  { id: 'safety', name: 'Safety and Compliance',   short: 'Safety',    head: 'u8',
+    what: 'Every safety report, investigated independently of the depot that is being complained about.' }
+];
+
 const CATEGORIES = [
-  { id: 'reckless',   name: 'Dangerous driving',        pri: 'P1', group: 'Safety' },
-  { id: 'access',     name: 'Accessibility refused',    pri: 'P1', group: 'Safety' },
-  { id: 'conduct',    name: 'Driver or conductor conduct', pri: 'P2', group: 'Staff' },
-  { id: 'nostop',     name: 'Bus did not stop',         pri: 'P2', group: 'Service' },
-  { id: 'norun',      name: 'Service did not run',      pri: 'P2', group: 'Service' },
-  { id: 'late',       name: 'Late running',             pri: 'P2', group: 'Service' },
-  { id: 'crowding',   name: 'Overcrowding',             pri: 'P2', group: 'Service' },
-  { id: 'fare',       name: 'Fare or change dispute',   pri: 'P3', group: 'Money' },
-  { id: 'condition',  name: 'Vehicle condition',        pri: 'P3', group: 'Fleet'   },
-  { id: 'lost',       name: 'Lost property',            pri: 'P3', group: 'Other'   },
-  { id: 'stop',       name: 'Bus stop or shelter',      pri: 'P3', group: 'Fleet'   },
-  { id: 'timetable',  name: 'Timetable or route request', pri: 'P3', group: 'Other' },
-  { id: 'compliment', name: 'Compliment',               pri: 'NA', group: 'Praise'  }
+  { id: 'reckless',   name: 'Dangerous driving',        pri: 'P1', group: 'Safety',  section: 'safety' },
+  { id: 'access',     name: 'Accessibility refused',    pri: 'P1', group: 'Safety',  section: 'safety' },
+  { id: 'conduct',    name: 'Driver or conductor conduct', pri: 'P2', group: 'Staff', section: 'crew' },
+  { id: 'nostop',     name: 'Bus did not stop',         pri: 'P2', group: 'Service', section: 'ops' },
+  { id: 'norun',      name: 'Service did not run',      pri: 'P2', group: 'Service', section: 'ops' },
+  { id: 'late',       name: 'Late running',             pri: 'P2', group: 'Service', section: 'ops' },
+  { id: 'crowding',   name: 'Overcrowding',             pri: 'P2', group: 'Service', section: 'ops' },
+  { id: 'fare',       name: 'Fare or change dispute',   pri: 'P3', group: 'Money',   section: 'fin' },
+  { id: 'condition',  name: 'Vehicle condition',        pri: 'P3', group: 'Fleet',   section: 'fleet' },
+  { id: 'lost',       name: 'Lost property',            pri: 'P3', group: 'Other',   section: 'care' },
+  { id: 'stop',       name: 'Bus stop or shelter',      pri: 'P3', group: 'Fleet',   section: 'infra' },
+  { id: 'timetable',  name: 'Timetable or route request', pri: 'P3', group: 'Other', section: 'ops' },
+  { id: 'compliment', name: 'Compliment',               pri: 'NA', group: 'Praise',  section: 'crew' }
 ];
 
 const CHANNELS = [
@@ -89,18 +115,74 @@ const ROUTES = [
    offer her, and the workload panel says why. It is the sort of thing
    an operations manager asks about in the first five minutes.        */
 const STAFF = [
-  { id: 'u1', name: 'Alvin Servina',    title: 'Customer Care Agent',        role: 'agent',      initials: 'AS', available: true  },
-  { id: 'u2', name: 'Bernard Athanase', title: 'Customer Care Agent',        role: 'agent',      initials: 'BA', available: true  },
-  { id: 'u3', name: 'Tessa Cadeau',     title: 'Customer Care Agent',        role: 'agent',      initials: 'TC', available: true  },
-  { id: 'u4', name: 'Joanna Freminot',  title: 'Customer Care Agent',        role: 'agent',      initials: 'JF', available: false, why: 'on leave' },
-  { id: 'u5', name: 'Régine Vidot',     title: 'Complaints Desk Supervisor', role: 'supervisor', initials: 'RV', available: true  },
-  { id: 'u6', name: 'Terence Bristol',  title: 'Head of Customer Care',      role: 'supervisor', initials: 'TB', available: true  },
-  { id: 'u7', name: 'Clara Mancienne',  title: 'Route Supervisor',           role: 'ops',        initials: 'CM', available: true  },
-  { id: 'u8', name: 'Ronny Adrienne',   title: 'Quality Auditor',            role: 'ops',        initials: 'RA', available: true  }
+  { id: 'u1', name: 'Alvin Servina',    title: 'Customer Care Agent',        role: 'agent',      initials: 'AS', available: true,  sec: 'care' },
+  { id: 'u2', name: 'Bernard Athanase', title: 'Customer Care Agent',        role: 'agent',      initials: 'BA', available: true,  sec: 'care' },
+  { id: 'u3', name: 'Tessa Cadeau',     title: 'Customer Care Agent',        role: 'agent',      initials: 'TC', available: true,  sec: 'care' },
+  { id: 'u4', name: 'Joanna Freminot',  title: 'Customer Care Agent',        role: 'agent',      initials: 'JF', available: false, why: 'on leave', sec: 'care' },
+  { id: 'u5', name: 'Régine Vidot',     title: 'Complaints Desk Supervisor', role: 'supervisor', initials: 'RV', available: true,  sec: 'care' },
+  { id: 'u6', name: 'Terence Bristol',  title: 'Head of Customer Care',      role: 'supervisor', initials: 'TB', available: true,  sec: 'care' },
+  { id: 'u7', name: 'Clara Mancienne',  title: 'Route Supervisor',           role: 'ops',        initials: 'CM', available: true,  sec: 'infra' },
+  { id: 'u8', name: 'Ronny Adrienne',   title: 'Quality Auditor',            role: 'ops',        initials: 'RA', available: true,  sec: 'safety' },
+
+  /* the rest of the operator - the people a complaint is actually
+     sent to. Same placeholder directory as above.                   */
+  { id: 'u9',  name: 'Nadine Hoareau',  title: 'Director of Operations',     role: 'exec',       initials: 'NH', available: true,  sec: 'ops'   },
+  { id: 'u10', name: 'Jean-Paul Rose',  title: 'Bus Operations Manager',     role: 'head',       initials: 'JR', available: true,  sec: 'ops'   },
+  { id: 'u11', name: 'Marcel Payet',    title: 'Chief Executive Officer',    role: 'exec',       initials: 'MP', available: true,  sec: 'care'  },
+  { id: 'u12', name: 'Sylvia Dugasse',  title: 'HR Director',                role: 'head',       initials: 'SD', available: true,  sec: 'crew'  },
+  { id: 'u13', name: 'Fabienne Larue',  title: 'HR Officer',                 role: 'member',     initials: 'FL', available: true,  sec: 'crew'  },
+  { id: 'u14', name: 'Marie Confait',   title: 'Fleet Maintenance Manager',  role: 'head',       initials: 'MC', available: true,  sec: 'fleet' },
+  { id: 'u15', name: 'Georges Marie',   title: 'Finance Manager',            role: 'head',       initials: 'GM', available: true,  sec: 'fin'   },
+  { id: 'u16', name: 'Elsie Nourrice',  title: 'Workshop Scheduler',         role: 'member',     initials: 'EN', available: true,  sec: 'fleet' },
+  { id: 'u17', name: 'Dora Esparon',    title: 'Training Coordinator',       role: 'member',     initials: 'DE', available: true,  sec: 'crew'  }
 ];
 const AGENTS = STAFF.filter(s => s.role === 'agent');
 /* who can actually be given a new case right now */
 const ASSIGNABLE = AGENTS.filter(s => s.available);
+
+/* --- who gets told, and when -------------------------------------
+   SPTC's own words: the case should go straight to the section that
+   resolves it, and a few managers should be told so they can keep
+   track. These are the rules that do that. Each one is a sentence a
+   manager can read, agree with or cross out - which is the point,
+   because this table is the thing to argue about in the next
+   meeting, not the software.
+
+   `who` is written in job terms rather than names, so the rule
+   survives somebody leaving. Tokens are resolved in app.js.        */
+const NOTIFY_RULES = [
+  { id: 'R1', on: 'logged',   label: 'Routed to a section',
+    who: ['section-head'], how: 'Email and in-system',
+    what: 'The head of the receiving section is told the moment a case lands with them.' },
+
+  { id: 'R2', on: 'logged',   label: 'Care keeps oversight',
+    who: ['care-head', 'complaints-supervisor'], how: 'In-system',
+    what: 'Customer Care is copied on everything, including work it does not do itself, because it still owns the passenger.' },
+
+  { id: 'R3', on: 'logged',   only: 'P1', label: 'Safety report received',
+    who: ['safety-head', 'ops-director'], how: 'SMS and email',
+    what: 'A safety report reaches the Safety Officer and the Director of Operations immediately, at any hour.' },
+
+  { id: 'R4', on: 'due-soon', label: 'Reply falling due',
+    who: ['owner', 'section-head'], how: 'In-system',
+    what: 'Sent once three quarters of the reply time has gone and the passenger still has no answer.' },
+
+  { id: 'R5', on: 'breached', label: 'Past target',
+    who: ['section-head', 'care-head'], how: 'Email and in-system',
+    what: 'The reply target has been missed. This is the escalation, and it goes one level above the person holding the case.' },
+
+  { id: 'R6', on: 'breached', only: 'P1', label: 'Safety case overdue',
+    who: ['ops-director', 'ceo'], how: 'SMS and email',
+    what: 'A safety case past its target goes to the Director of Operations and the Chief Executive. Nothing sits quietly.' },
+
+  { id: 'R7', on: 'redirected', label: 'Moved between sections',
+    who: ['section-head', 'previous-section-head', 'care-head'], how: 'In-system',
+    what: 'Both sections are told when a case is redirected, so it cannot be dropped in the gap between them.' },
+
+  { id: 'R8', on: 'resolved',  label: 'Case settled',
+    who: ['care-head', 'section-head'], how: 'In-system',
+    what: 'The closing answer is copied to Customer Care so what the passenger is told stays consistent.' }
+];
 
 /* --- invented passengers ----------------------------------------- */
 /* Seychelles mobile numbers are seven digits beginning with 2, written
@@ -229,7 +311,7 @@ function buildSeed() {
      money and fleet, and a genuine handful of compliments.          */
   const weights = {
     late: 9, nostop: 8, conduct: 8, norun: 6, crowding: 5, condition: 5,
-    fare: 4, lost: 4, reckless: 3, stop: 3, compliment: 4, access: 2, timetable: 2
+    fare: 5, lost: 4, reckless: 3, stop: 5, compliment: 4, access: 2, timetable: 2
   };
   const bag = [];
   Object.keys(weights).forEach(k => { for (let i = 0; i < weights[k]; i++) bag.push(k); });
@@ -298,6 +380,11 @@ function buildSeed() {
         channel: pick(CHANNELS).id,
         category: catId,
         priority: cat.pri,
+        /* where the subject sent it. Held on the case rather than
+           looked up, because a case can be redirected by hand and
+           must then remember where it actually is.                 */
+        section: cat.section,
+        routedBy: 'rule',
         routeNo: route.no,
         fleetNo: 'BUS-' + (100 + Math.floor(rng() * 78)),
         incidentAt: created - (rng() * 20) * HOUR,
@@ -346,5 +433,78 @@ function buildSeed() {
     t.notes.sort((a, b) => a.at - b.at);
   });
 
+  /* A few cases were sent to the wrong section by the subject chosen
+     and moved by hand afterwards. Rules get things mostly right and
+     never entirely right, and a demo that hides that is selling
+     something dishonest. Each redirection is recorded, with a reason,
+     on the case itself.                                             */
+  const MISROUTES = [
+    { from: 'ops',   to: 'fleet',  why: 'Cancellation was caused by a vehicle defect, not a crew or scheduling failure. Passed to the workshop.' },
+    { from: 'crew',  to: 'ops',    why: 'Crew acted on a controller instruction. This is a scheduling matter, not a conduct one.' },
+    { from: 'fin',   to: 'crew',   why: 'Float reconciled and correct. The issue is how the passenger was spoken to, so it belongs with Crew.' },
+    { from: 'infra', to: 'ops',    why: 'Shelter is serviceable. The complaint is really about the timetable displayed on it.' }
+  ];
+  tickets.forEach(t => {
+    if (t.priority === 'P1' || t.category === 'compliment') return;   /* never reroute a safety report by accident */
+    /* pick the rule that starts where this case actually is, rather
+       than walking the list in order - stepping through the list only
+       ever matched its first entry and produced a single misroute */
+    const m = MISROUTES.filter(x => x.from === t.section)[0];
+    if (!m) return;
+    if (rng() > 0.12) return;
+    const at = t.createdAt + (0.5 + rng() * 4) * HOUR;
+    if (at > Date.now()) return;
+    t.redirected = { at, from: m.from, to: m.to, by: 'u5', why: m.why };
+    t.section = m.to;
+    t.routedBy = 'hand';
+    t.notes.push({ at, by: 'u5', kind: 'routing', text: m.why });
+    t.notes.sort((a, b) => a.at - b.at);
+  });
+
   return tickets;
+}
+
+/* --- the notifications those rules would have sent ---------------
+   Built from the cases themselves rather than invented separately,
+   so every line in the alert log points at a case that exists and
+   says which rule produced it. If somebody asks "why was I told
+   about this", there is an answer on the screen.                   */
+function buildAlerts(tickets) {
+  const out = [];
+  const now = Date.now();
+  let n = 0;
+  const add = (at, ruleId, t, extra) => {
+    if (at > now) return;
+    n++;
+    out.push({ id: 'A' + n, at, rule: ruleId, ticketId: t.id, ref: t.ref, section: t.section, priority: t.priority, extra: extra || null });
+  };
+
+  tickets.forEach(t => {
+    const pri = PRIORITIES[t.priority];
+    add(t.createdAt, 'R1', t);
+    add(t.createdAt + 1000, 'R2', t);
+    if (t.priority === 'P1') add(t.createdAt + 2000, 'R3', t);
+
+    if (t.redirected) add(t.redirected.at, 'R7', t, { from: t.redirected.from, to: t.redirected.to });
+
+    if (pri.respondH != null) {
+      const due = t.createdAt + pri.respondH * HOUR;
+      const answered = t.firstResponseAt;
+      /* the warning only fires if nobody had answered by then */
+      const warnAt = t.createdAt + pri.respondH * 0.75 * HOUR;
+      if (!answered || answered > warnAt) add(warnAt, 'R4', t);
+      if (!answered || answered > due) {
+        add(due, 'R5', t);
+        if (t.priority === 'P1') add(due + 1000, 'R6', t);
+      }
+    }
+
+    if (t.resolvedAt) add(t.resolvedAt, 'R8', t);
+  });
+
+  out.sort((a, b) => b.at - a.at);
+  /* Everything older than a day is treated as already seen, otherwise
+     the unread badge reads like a broken inbox rather than a desk. */
+  out.forEach(a => { a.read = a.at < now - 24 * HOUR; });
+  return out;
 }

@@ -30,6 +30,21 @@ somebody, and being answered inside an agreed time.
 
 - **Intake** — log a case against a route, a vehicle and a subject, from any
   of seven channels including WhatsApp and walk-in.
+- **Routing.** Choosing the subject sends the case to the section that
+  resolves it — Operations, Crew, Fleet, Finance, Stops and Shelters, Safety
+  or Customer Care. The agent sees where it is going, and who is about to be
+  told, *before* saving. It can be overridden by hand, and an override is
+  labelled as one.
+- **Notification rules.** Eight rules decide who is told and when: the
+  receiving section head on arrival, Customer Care on everything, an SMS to
+  the Safety Officer and the Director of Operations on a safety report, an
+  escalation when a target is missed, and the Chief Executive when a safety
+  case goes past its target. Every notification is logged against the case
+  that produced it and says which rule fired.
+- **Redirection.** A case can be moved between sections. A reason is
+  required, kept on the case, shown in the timeline, and both section heads
+  are told — because a case dropped in the gap between two departments is
+  the failure this whole system exists to prevent.
 - **A queue that sorts itself** by what will run out of time first, not by
   what arrived first.
 - **Live service-level clocks.** While a case is unanswered the clock shown is
@@ -69,8 +84,19 @@ room wifi does not.
 | What | Where |
 |---|---|
 | Routes, staff, categories, service targets, sample text | `assets/data.js` |
+| **Which section a subject goes to** | `section:` on each entry in `CATEGORIES`, `assets/data.js` |
+| **The sections themselves, and who heads them** | `SECTIONS`, `assets/data.js` |
+| **Who is notified, and when** | `NOTIFY_RULES`, `assets/data.js` |
 | Screens and behaviour | `assets/app.js` |
 | Appearance, light and dark themes | `assets/app.css` |
+
+The three rows in bold are the workflow. They are deliberately written as
+data rather than buried in code, and the **Routing rules** screen renders
+them straight out of those tables — so what is on screen in a meeting cannot
+drift from what the system actually does. Recipients are named by job
+(`section-head`, `ops-director`, `ceo`) rather than by person, so a rule
+survives somebody leaving; the jobs are resolved to people in `WHO_TOKENS`
+in `app.js`.
 
 State is kept in the browser's local storage, so anything logged during a
 meeting survives a refresh. **Reset the demonstration** in the bottom left
@@ -85,5 +111,11 @@ data in their browser and never sees the correction.
 It is a front end with realistic behaviour, not a deployed product. There is
 no server, no database, no authentication, no email or SMS out, and nothing
 is shared between two people looking at it — each browser holds its own copy.
+
+**The notifications are not sent.** The rules run, the recipients are worked
+out properly and everything is logged exactly as it would be, but no email
+or SMS leaves the browser. Say so plainly if anyone asks in a meeting; the
+routing logic is the hard part and it is real, whereas actually delivering
+the message is a day's work once there is a server to do it from.
 Those are the things that turn this into a system, and they are the next
 conversation, not this one.

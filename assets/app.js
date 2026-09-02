@@ -19,7 +19,8 @@ function load() {
       if (p && p.tickets && p.tickets.length && p.v === SEED_VERSION) return p;
     }
   } catch (e) { /* fall through to a fresh seed */ }
-  return { v: SEED_VERSION, tickets: buildSeed(), me: 'u6', theme: 'dark', seq: 0 };
+  const tickets = buildSeed();
+  return { v: SEED_VERSION, tickets, alerts: buildAlerts(tickets), me: 'u6', theme: 'dark', seq: 0 };
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
 function reset() {
@@ -39,6 +40,64 @@ const staff = id => STAFF.find(s => s.id === id) || null;
 const route = no => ROUTES.find(r => r.no === no) || { no, name: '' };
 const me = () => staff(state.me);
 const isOpen = t => OPEN_STATUSES.includes(t.status);
+const sec = id => SECTIONS.find(s => s.id === id) || { id: id, name: id, short: id, head: null, what: '' };
+const secOf = t => sec(t.section || cat(t.category).section);
+const rule = id => NOTIFY_RULES.find(r => r.id === id) || { id: id, label: id, who: [], how: '', what: '' };
+
+/* ---------------- who gets told ----------------
+   The rules name jobs, not people, so that a rule survives somebody
+   leaving. This is where a job becomes a person.
+   ------------------------------------------------------------------ */
+const WHO_TOKENS = {
+  'section-head':          c => sec(c.section).head,
+  'previous-section-head': c => (c.from ? sec(c.from).head : null),
+  'care-head':             () => 'u6',
+  'complaints-supervisor': () => 'u5',
+  'safety-head':           () => sec('safety').head,
+  'ops-director':          () => 'u9',
+  'ceo':                   () => 'u11',
+  'owner':                 c => c.assignee || null
+};
+const WHO_LABEL = {
+  'section-head': 'Head of the receiving section',
+  'previous-section-head': 'Head of the section it came from',
+  'care-head': 'Head of Customer Care',
+  'complaints-supervisor': 'Complaints Desk Supervisor',
+  'safety-head': 'Safety and Compliance',
+  'ops-director': 'Director of Operations',
+  'ceo': 'Chief Executive',
+  'owner': 'Whoever holds the case'
+};
+
+/* resolve a rule's recipients against one case; drops anybody the
+   rule asks for who does not exist on this case (an unassigned case
+   has no owner to tell) and never tells the same person twice */
+function recipients(r, ctx) {
+  const out = [];
+  (r.who || []).forEach(tok => {
+    const fn = WHO_TOKENS[tok];
+    const id = fn ? fn(ctx) : null;
+    if (id && out.indexOf(id) === -1) out.push(id);
+  });
+  return out;
+}
+
+/* Raise a notification for something that just happened on screen.
+   Same shape as the seeded ones, so the log does not have two kinds
+   of row in it. */
+function notify(ruleId, t, extra) {
+  const r = NOTIFY_RULES.find(x => x.id === ruleId);
+  if (!r) return null;
+  if (r.only && t.priority !== r.only) return null;
+  state.alerts.unshift({
+    id: 'A' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    at: Date.now(), rule: ruleId, ticketId: t.id, ref: t.ref,
+    section: t.section, priority: t.priority, extra: extra || null, read: false
+  });
+  return r;
+}
+function alertsFor(id) { return state.alerts.filter(a => a.ticketId === id).sort((a, b) => b.at - a.at); }
+function unreadAlerts() { return state.alerts.filter(a => !a.read).length; }
 
 function fmtDate(ms) {
   const d = new Date(ms);
@@ -116,11 +175,14 @@ function router() {
   const view = parts[0] || 'dashboard';
   document.querySelectorAll('.nav a').forEach(a =>
     a.classList.toggle('on', a.getAttribute('href') === '#/' + view));
-  if (view === 'queue')       renderQueue();
-  else if (view === 't')      renderTicket(parts[1]);
-  else if (view === 'new')    renderNew();
-  else if (view === 'routes') renderRoutes();
-  else                        renderDashboard();
+  if (view === 'queue')          renderQueue();
+  else if (view === 't')         renderTicket(parts[1]);
+  else if (view === 'new')       renderNew();
+  else if (view === 'routes')    renderRoutes();
+  else if (view === 'sections')  renderSections();
+  else if (view === 'alerts')    renderAlerts();
+  else if (view === 'rules')     renderRules();
+  else                           renderDashboard();
   window.scrollTo(0, 0);
 }
 
@@ -181,6 +243,10 @@ function renderDashboard() {
     (sup ? '<div class="grid k2" style="margin-bottom:14px">' +
       card('Busiest routes', 'by volume', bars(byRoute(T).slice(0, 8), 'name', 'n')) +
       card('Safety reports', 'last 21 days', safetyPanel(T)) +
+      '</div>' +
+      '<div class="grid k2" style="margin-bottom:14px">' +
+      card('Where the work has been sent', 'open cases by section', sectionBars(open)) +
+      card('Recent notifications', unreadAlerts() + ' unread', recentAlerts()) +
       '</div>' : '') +
 
     card('Needs attention first', overdue.length + ' past target',
@@ -251,6 +317,44 @@ function workload(open) {
     '<span class="vv mono" style="text-align:right">' + r.n + '</span></div>').join('') +
     '</div>' + (un ? '<div class="hint" style="margin-top:12px">' + un + ' unassigned, sitting in the New queue</div>' : '');
 }
+/* open cases per section, with the late ones called out - the number a
+   section head is judged on, not the total */
+function sectionBars(open) {
+  const rows = SECTIONS.map(s => {
+    const mine = open.filter(t => secOf(t).id === s.id);
+    return { s, n: mine.length, bad: mine.filter(t => sla(t).breached).length };
+  }).sort((a, b) => b.n - a.n);
+  const max = Math.max.apply(null, rows.map(r => r.n).concat([1]));
+  return '<div class="bars">' + rows.map((r, i) =>
+    '<div class="row" style="cursor:pointer" onclick="qf.section=\'' + r.s.id +
+      '\';qf.status=\'open\';qf.touched=1;location.hash=\'#/queue\'">' +
+    '<span class="nm" title="' + esc(r.s.name) + '">' + esc(r.s.name) + '</span>' +
+    '<span class="tr"><i style="width:' + (r.n / max * 100) + '%;animation-delay:' + (i * 45) + 'ms;' +
+      'background:var(--sc-' + r.s.id + ')"></i></span>' +
+    '<span class="vv">' + r.n + (r.bad ? ' <span style="color:var(--coral)">·' + r.bad + '</span>' : '') +
+    '</span></div>').join('') + '</div>' +
+    '<div class="hint" style="margin-top:11px">Open cases. A red figure is how many of them are past their ' +
+    'target. <a href="#/sections">Section board</a></div>';
+}
+
+/* the last few things the rules sent, so a supervisor sees the traffic
+   without leaving the control desk */
+function recentAlerts() {
+  const list = state.alerts.slice(0, 6);
+  if (!list.length) return '<div class="hint">Nothing sent yet.</div>';
+  return '<div class="tal">' + list.map(a => {
+    const r = rule(a.rule), s = sec(a.section);
+    return '<div class="tal-r" style="cursor:pointer" onclick="location.hash=\'#/t/' + a.ticketId + '\'">' +
+      '<div><span class="rulechip">' + esc(r.id) + '</span> ' +
+      '<span style="font-size:12.5px">' + esc(r.label) + '</span> ' +
+      '<span class="secpill sc-' + esc(s.id) + '">' + esc(s.short) + '</span>' +
+      '<div class="hint" style="margin-top:3px">' + esc(a.ref) + ' · ' + esc(r.how) + '</div></div>' +
+      '<span class="lbl mono" style="white-space:nowrap">' + esc(ago(a.at)) + '</span></div>';
+  }).join('') + '</div>' +
+  '<div class="hint" style="margin-top:11px"><a href="#/alerts">The full log</a>, and the ' +
+  '<a href="#/rules">rules that produce it</a>.</div>';
+}
+
 function safetyPanel(T) {
   const s = T.filter(t => t.priority === 'P1');
   const openS = s.filter(isOpen);
@@ -304,7 +408,7 @@ function drawTrend(T) {
 }
 
 /* ---------------- queue ---------------- */
-let qf = { status: 'open', cat: '', route: '', assignee: '', q: '', mine: false };
+let qf = { status: 'open', cat: '', route: '', section: '', assignee: '', q: '', mine: false };
 
 function sortByUrgency(list) {
   return list.slice().sort((a, b) => {
@@ -331,6 +435,7 @@ function renderQueue() {
         '<option value="">Every status</option>' + opts(STATUSES.map(s => ({ v: s, l: s })), qf.status, 'v', 'l') + '</select>' +
       '<select id="fc"><option value="">Every subject</option>' + opts(CATEGORIES.map(c => ({ v: c.id, l: c.name })), qf.cat, 'v', 'l') + '</select>' +
       '<select id="fr"><option value="">Every route</option>' + opts(ROUTES.map(r => ({ v: r.no, l: 'Route ' + r.no })), qf.route, 'v', 'l') + '</select>' +
+      '<select id="fsec"><option value="">Every section</option>' + opts(SECTIONS.map(s => ({ v: s.id, l: s.name })), qf.section, 'v', 'l') + '</select>' +
       '<button class="chipbtn' + (qf.mine ? ' on' : '') + '" id="fmine">Assigned to me</button>' +
       '<button class="chipbtn" id="fclear">Clear</button>' +
       '<span class="spacer"></span>' +
@@ -342,8 +447,9 @@ function renderQueue() {
   $('#fs').onchange = e => { qf.status = e.target.value; qf.touched = 1; paintQueue(); };
   $('#fc').onchange = e => { qf.cat = e.target.value; qf.touched = 1; paintQueue(); };
   $('#fr').onchange = e => { qf.route = e.target.value; qf.touched = 1; paintQueue(); };
+  $('#fsec').onchange = e => { qf.section = e.target.value; qf.touched = 1; paintQueue(); };
   $('#fmine').onclick = () => { qf.mine = !qf.mine; qf.touched = 1; renderQueue(); };
-  $('#fclear').onclick = () => { qf = { status: 'open', cat: '', route: '', assignee: '', q: '', mine: false, touched: 1 }; renderQueue(); };
+  $('#fclear').onclick = () => { qf = { status: 'open', cat: '', route: '', section: '', assignee: '', q: '', mine: false, touched: 1 }; renderQueue(); };
   paintQueue();
 }
 
@@ -354,6 +460,7 @@ function filtered() {
     else if (qf.status && t.status !== qf.status) return false;
     if (qf.cat && t.category !== qf.cat) return false;
     if (qf.route && t.routeNo !== qf.route) return false;
+    if (qf.section && secOf(t).id !== qf.section) return false;
     if (qf.mine && t.assignee !== state.me) return false;
     if (q) {
       const hay = (t.ref + ' ' + t.passenger + ' ' + t.summary + ' ' + t.detail + ' ' + cat(t.category).name).toLowerCase();
@@ -375,7 +482,9 @@ function table(rows) {
     rows.map((t, i) =>
       '<tr class="rowin" style="animation-delay:' + Math.min(i * 18, 320) + 'ms" onclick="location.hash=\'#/t/' + t.id + '\'">' +
       '<td data-label="Reference"><span class="ref">' + esc(t.ref) + '</span><div class="meta">' + esc(ago(t.createdAt)) + '</div></td>' +
-      '<td data-label="Case"><div class="sum">' + esc(cat(t.category).name) + '</div>' +
+      '<td data-label="Case"><div class="sum">' + esc(cat(t.category).name) +
+        ' <span class="secpill sc-' + esc(secOf(t).id) + '">' + esc(secOf(t).short) + '</span>' +
+        (t.routedBy === 'hand' ? '<span class="lbl" title="moved by hand, reason on the case"> moved</span>' : '') + '</div>' +
         '<div class="meta">' + esc(t.passenger) + ' · ' + esc(chan(t.channel)) + '</div></td>' +
       '<td data-label="Route"><span class="route">' + esc(t.routeNo) + '</span><div class="meta">' + esc(t.fleetNo) + '</div></td>' +
       '<td data-label="Priority">' + priPill(t.priority) + '</td>' +
@@ -405,13 +514,70 @@ function renderTicket(id) {
         (isOpen(t) ? card('Add to this case', '', workForm(t)) : '') +
       '</div>' +
       '<div style="display:grid;gap:14px;align-content:start">' +
+        card('Handled by', secOf(t).short, sectionPanel(t)) +
         card('Time target', p.respondH ? p.label : 'none', slaPanel(t)) +
         card('Details', '', facts(t)) +
         card('Actions', '', actions(t)) +
+        card('Who has been told', alertsFor(t.id).length + '', ticketAlerts(t)) +
       '</div>' +
     '</div>';
   wireTicket(t);
 }
+/* Where the case went, why, and the one control that moves it. The
+   reason is required - a case that changes hands without one is how
+   things get lost between two departments who each think the other
+   has it. */
+function sectionPanel(t) {
+  const s = secOf(t), h = staff(s.head), c = cat(t.category);
+  const byRule = t.routedBy !== 'hand';
+  let html =
+    '<div class="secbox"><span class="secpill sc-' + esc(s.id) + '">' + esc(s.short) + '</span>' +
+    '<div><div style="font-size:13px;font-weight:600">' + esc(s.name) + '</div>' +
+    '<div class="hint">' + (byRule
+      ? 'Sent here automatically because the subject is &ldquo;' + esc(c.name) + '&rdquo;.'
+      : 'Moved here by hand.') + '</div></div></div>';
+
+  if (h) html += '<div class="sec-head" style="margin-top:12px">' +
+    '<span class="av" style="width:24px;height:24px;font-size:9.5px">' + h.initials + '</span>' +
+    '<div><div style="font-size:12.5px">' + esc(h.name) + '</div>' +
+    '<div class="hint">' + esc(h.title) + '</div></div></div>';
+
+  if (t.redirected) html +=
+    '<div class="movebox"><div class="lbl">Moved ' + esc(fmtDate(t.redirected.at)) + '</div>' +
+    '<div style="font-size:12.5px;margin:5px 0 6px">' + esc(sec(t.redirected.from).name) + ' &rarr; ' +
+      esc(sec(t.redirected.to).name) + '</div>' +
+    '<div class="hint">' + esc(t.redirected.why) + '</div>' +
+    '<div class="hint" style="margin-top:6px">by ' + esc((staff(t.redirected.by) || {}).name || '') + '</div></div>';
+
+  if (isOpen(t)) {
+    html += '<div class="frm" style="margin-top:12px">' +
+      '<label><span class="lbl">Send it somewhere else</span><select id="secsel">' +
+      SECTIONS.map(x => '<option value="' + x.id + '"' + (x.id === s.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') +
+      '</select></label>' +
+      (t.priority === 'P1' ? '<div class="hint">This is a safety report. Moving it out of Safety and Compliance is possible but is recorded and notified upwards.</div>'
+                           : '<div class="hint">A reason is required, and both section heads are told.</div>') +
+      '</div>';
+  }
+  return html;
+}
+
+function ticketAlerts(t) {
+  const list = alertsFor(t.id);
+  if (!list.length) return '<div class="hint">Nothing has been sent about this case yet.</div>';
+  return '<div class="tal">' + list.slice(0, 8).map(a => {
+    const r = rule(a.rule);
+    const to = recipients(r, { section: a.section, from: a.extra ? a.extra.from : null, assignee: t.assignee })
+      .map(id => staff(id)).filter(Boolean);
+    return '<div class="tal-r"><div><span class="rulechip">' + esc(r.id) + '</span> ' +
+      '<span style="font-size:12.5px">' + esc(r.label) + '</span>' +
+      '<div class="hint" style="margin-top:3px">' + to.map(u => esc(u.name)).join(', ') +
+      (to.length ? ' · ' + esc(r.how) : 'no recipient') + '</div></div>' +
+      '<span class="lbl mono" style="white-space:nowrap">' + esc(ago(a.at)) + '</span></div>';
+  }).join('') + '</div>' +
+  (list.length > 8 ? '<div class="hint" style="margin-top:10px">' + (list.length - 8) + ' older. ' +
+    '<a href="#/alerts">Full log</a></div>' : '');
+}
+
 function slaPanel(t) {
   const s = sla(t), p = PRIORITIES[t.priority];
   if (s.kind === 'none')
@@ -444,7 +610,9 @@ function timeline(t) {
   return '<div class="tl">' + evs.map(e =>
     '<div class="ev ' + esc(e.kind) + '"><div class="when">' + esc(fmtDate(e.at)) + '</div>' +
     (e.by ? '<div class="who2">' + esc(staff(e.by) ? staff(e.by).name : '') + ' · ' +
-      (e.kind === 'internal' ? 'internal note' : e.kind === 'resolution' ? 'resolution' : 'reply to passenger') + '</div>' : '') +
+      (e.kind === 'internal' ? 'internal note' :
+       e.kind === 'resolution' ? 'resolution' :
+       e.kind === 'routing' ? 'moved to another section' : 'reply to passenger') + '</div>' : '') +
     '<div class="txt">' + esc(e.text) + '</div></div>').join('') + '</div>';
 }
 function workForm(t) {
@@ -493,6 +661,24 @@ function wireTicket(t) {
     save(); toast('Owner changed.'); renderTicket(t.id);
   };
   if ($('#stt')) $('#stt').onchange = e => { t.status = e.target.value; save(); renderTicket(t.id); };
+  if ($('#secsel')) $('#secsel').onchange = e => {
+    const to = e.target.value, from = secOf(t).id;
+    if (to === from) return;
+    const why = prompt('Why is this case being moved from ' + sec(from).name + ' to ' + sec(to).name + '?\n\n' +
+      'This is kept on the case and both section heads are told.');
+    if (why == null || !why.trim()) { renderTicket(t.id); return; }   /* cancelled: put the dropdown back */
+    const at = Date.now();
+    t.redirected = { at, from, to, by: state.me, why: why.trim() };
+    t.section = to;
+    t.routedBy = 'hand';
+    t.notes.push({ at, by: state.me, kind: 'routing', text: why.trim() });
+    t.notes.sort((a, b) => a.at - b.at);
+    const r = notify('R7', t, { from, to });
+    save();
+    const told = recipients(r, { section: to, from, assignee: t.assignee }).map(id => (staff(id) || {}).name).filter(Boolean);
+    toast('Moved to ' + sec(to).name + '. ' + (told.length ? told.join(' and ') + ' told.' : ''));
+    renderTicket(t.id);
+  };
   if ($('#takeit')) $('#takeit').onclick = () => {
     t.assignee = state.me; t.status = 'Assigned'; save(); toast('You own this case now.'); renderTicket(t.id);
   };
@@ -503,7 +689,8 @@ function wireTicket(t) {
     if (!t.firstResponseAt) t.firstResponseAt = Date.now();
     if (!t.assignee) t.assignee = state.me;
     t.notes.push({ at: Date.now(), by: state.me, kind: 'resolution', text: txt });
-    save(); toast('Case settled.'); renderTicket(t.id);
+    notify('R8', t);
+    save(); toast('Case settled. Customer Care and ' + sec(secOf(t).id).name + ' copied in.'); renderTicket(t.id);
   };
   if ($('#reopen')) $('#reopen').onclick = () => {
     t.status = 'In progress'; t.resolvedAt = null; save(); renderTicket(t.id);
@@ -526,6 +713,9 @@ function renderNew() {
           CATEGORIES.map(c => '<option value="' + c.id + '">' + esc(c.name) + ' (' + (c.pri === 'NA' ? 'no target' : c.pri) + ')</option>').join('') +
         '</select></label>' +
       '</div>' +
+      /* the thing SPTC asked for: choosing the subject sends the case
+         somewhere, and the agent can see where before saving          */
+      '<div class="routebox" id="n_routebox"></div>' +
       '<div class="two">' +
         '<label><span class="lbl">Route</span><select id="n_route">' +
           ROUTES.map(r => '<option value="' + r.no + '">' + r.no + ' — ' + esc(r.name) + '</option>').join('') + '</select></label>' +
@@ -547,12 +737,64 @@ function renderNew() {
       }, '') + '<div class="hint" style="margin-top:12px">Reply target / resolution target. Safety subjects also alert a supervisor immediately.</div>') +
     '</div>';
 
+  /* nRoute holds what the intake screen has decided so far. It starts
+     as whatever the subject implies and only becomes 'hand' if the
+     agent overrides it, because that distinction is worth keeping. */
+  let nRoute = { section: cat($('#n_cat').value).section, by: 'rule' };
+
+  function paintRouteBox() {
+    const c = cat($('#n_cat').value);
+    const s = sec(nRoute.section), h = staff(s.head);
+    const fired = NOTIFY_RULES.filter(r => r.on === 'logged' && (!r.only || r.only === c.pri));
+    const told = [];
+    fired.forEach(r => recipients(r, { section: s.id, assignee: null }).forEach(id => {
+      if (told.indexOf(id) === -1) told.push(id);
+    }));
+
+    $('#n_routebox').innerHTML =
+      '<div class="rb-top"><span class="lbl">This will go to</span>' +
+        (nRoute.by === 'rule'
+          ? '<span class="lbl auto">chosen by the subject</span>'
+          : '<span class="lbl auto hand">overridden by hand</span>') + '</div>' +
+      '<div class="rb-mid">' +
+        '<span class="secpill sc-' + esc(s.id) + '">' + esc(s.short) + '</span>' +
+        '<select id="n_sec">' + SECTIONS.map(x => '<option value="' + x.id + '"' +
+            (x.id === s.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select>' +
+      '</div>' +
+      (h ? '<div class="hint">Lands with ' + esc(h.name) + ', ' + esc(h.title) + '.</div>' : '') +
+      '<div class="rb-told"><span class="lbl">Told straight away</span>' +
+        told.map(id => {
+          const u = staff(id);
+          return u ? '<span class="who-chip"><span class="av" style="width:18px;height:18px;font-size:8px">' +
+            u.initials + '</span>' + esc(u.name) + '</span>' : '';
+        }).join('') +
+      '</div>' +
+      (c.pri === 'P1' ? '<div class="hint p1note">A safety report. The Safety Officer and the Director of ' +
+        'Operations are sent an SMS as well, whatever the hour.</div>' : '');
+
+    $('#n_sec').onchange = e => {
+      nRoute.section = e.target.value;
+      nRoute.by = (e.target.value === cat($('#n_cat').value).section) ? 'rule' : 'hand';
+      paintRouteBox();
+    };
+  }
+
+  /* changing the subject re-routes, and silently drops a manual
+     override - a fresh subject means a fresh decision */
+  $('#n_cat').onchange = () => {
+    nRoute = { section: cat($('#n_cat').value).section, by: 'rule' };
+    paintRouteBox();
+  };
+  paintRouteBox();
+
   $('#n_demo').onclick = () => {
     const p = PASSENGERS[Math.floor(Math.random() * PASSENGERS.length)];
     $('#n_name').value = p[0]; $('#n_phone').value = p[1];
     $('#n_cat').value = 'nostop'; $('#n_route').value = '26';
     $('#n_fleet').value = 'BUS-' + (100 + Math.floor(Math.random() * 78));
     $('#n_detail').value = NARRATIVES.nostop[0];
+    nRoute = { section: cat('nostop').section, by: 'rule' };
+    paintRouteBox();
   };
   $('#n_save').onclick = () => {
     const name = $('#n_name').value.trim(), detail = $('#n_detail').value.trim();
@@ -566,10 +808,29 @@ function renderNew() {
       routeNo: $('#n_route').value, fleetNo: $('#n_fleet').value.trim() || '—',
       incidentAt: Date.now(), passenger: name, phone: $('#n_phone').value.trim(),
       summary: c.name + ' - route ' + $('#n_route').value, detail,
+      section: nRoute.section, routedBy: nRoute.by,
       status: 'New', assignee: null, firstResponseAt: null, resolvedAt: null, resolution: null, notes: []
     };
-    state.tickets.push(t); save();
-    toast('Logged as ' + t.ref + '. The clock is running.');
+    if (nRoute.by === 'hand') {
+      t.notes.push({ at: Date.now(), by: state.me, kind: 'routing',
+        text: 'Sent to ' + sec(nRoute.section).name + ' at intake rather than ' +
+              sec(c.section).name + ', which is where the subject would normally send it.' });
+    }
+    state.tickets.push(t);
+
+    /* fire the rules that apply to a case being logged, and tell the
+       agent what actually went out - a notification nobody can see is
+       indistinguishable from one that never happened */
+    const told = [];
+    NOTIFY_RULES.filter(r => r.on === 'logged').forEach(r => {
+      const fired = notify(r.id, t);
+      if (fired) recipients(fired, { section: t.section, assignee: null })
+        .forEach(id => { if (told.indexOf(id) === -1) told.push(id); });
+    });
+    save();
+
+    toast('Logged as ' + t.ref + ', sent to ' + sec(t.section).name + '. ' +
+          told.length + ' ' + (told.length === 1 ? 'person' : 'people') + ' told. The clock is running.');
     location.hash = '#/t/' + t.id;
   };
 }
@@ -603,6 +864,191 @@ function renderRoutes() {
     '</tbody></table></div>';
 }
 
+/* ---------------- sections ----------------
+   The board a duty manager stands in front of: who is holding what,
+   and which section is quietly running late.
+   ------------------------------------------------------------------ */
+function renderSections() {
+  setHead('By section', 'Where the work has been sent, and whether it is moving');
+  const T = state.tickets;
+  const rows = SECTIONS.map(s => {
+    const all = T.filter(t => secOf(t).id === s.id);
+    const open = all.filter(isOpen);
+    const late = open.filter(t => sla(t).breached);
+    const unanswered = open.filter(t => !t.firstResponseAt);
+    return { s, all: all.length, open: open.length, late: late.length, un: unanswered.length };
+  }).sort((a, b) => b.open - a.open || b.all - a.all);
+  const max = Math.max.apply(null, rows.map(x => x.all).concat([1]));
+
+  $('#view').innerHTML =
+    '<div class="hint" style="margin-bottom:14px">Choosing the subject of a complaint is what sends it to a section. ' +
+    'Nobody has to know who deals with what — and the rules that decide it are on the ' +
+    '<a href="#/rules">routing and notification</a> screen, in plain words, to be argued with.</div>' +
+    '<div class="grid k2 secgrid">' + rows.map((x, i) => {
+      const h = staff(x.s.head);
+      return '<div class="card sec-card rowin" style="animation-delay:' + (i * 40) + 'ms" ' +
+        'onclick="qf.section=\'' + x.s.id + '\';qf.status=\'open\';qf.touched=1;location.hash=\'#/queue\'">' +
+        '<div class="body">' +
+          '<div class="sec-top"><div><h3 style="margin:0;font-size:14.5px">' + esc(x.s.name) + '</h3>' +
+            '<div class="hint" style="margin-top:4px">' + esc(x.s.what) + '</div></div>' +
+            '<span class="secpill sc-' + x.s.id + '">' + esc(x.s.short) + '</span></div>' +
+          '<div class="sec-nums">' +
+            '<div><div class="lbl">Open</div><div class="mono big2">' + x.open + '</div></div>' +
+            '<div><div class="lbl">Unanswered</div><div class="mono big2" style="color:' + (x.un ? 'var(--amber)' : 'var(--faint)') + '">' + x.un + '</div></div>' +
+            '<div><div class="lbl">Past target</div><div class="mono big2" style="color:' + (x.late ? 'var(--coral)' : 'var(--faint)') + '">' + x.late + '</div></div>' +
+            '<div><div class="lbl">21 days</div><div class="mono big2" style="color:var(--dim)">' + x.all + '</div></div>' +
+          '</div>' +
+          '<div class="tr" style="margin:10px 0 12px"><i style="width:' + (x.all / max * 100) + '%"></i></div>' +
+          '<div class="sec-head">' + (h ? '<span class="av" style="width:24px;height:24px;font-size:9.5px">' + h.initials + '</span>' +
+            '<div><div style="font-size:12.5px">' + esc(h.name) + '</div><div class="hint">' + esc(h.title) + ' · told when a case arrives</div></div>' : '') +
+          '</div>' +
+        '</div></div>';
+    }).join('') + '</div>';
+}
+
+/* ---------------- notification log ----------------
+   "Notification is sent to a few other managers, to keep track" was
+   the request. This is that, made auditable: every line says which
+   rule fired, on which case, and who it reached.
+   ------------------------------------------------------------------ */
+let af = { rule: '', section: '', unread: false };
+
+function renderAlerts() {
+  setHead('Notifications', 'Everything the routing rules have told somebody about');
+  const opts = (arr, selv, vk, lk) => arr.map(o =>
+    '<option value="' + esc(o[vk]) + '"' + (String(selv) === String(o[vk]) ? ' selected' : '') + '>' + esc(o[lk]) + '</option>').join('');
+
+  $('#view').innerHTML =
+    '<div class="filters">' +
+      '<select id="ar"><option value="">Every rule</option>' +
+        opts(NOTIFY_RULES.map(r => ({ v: r.id, l: r.id + ' — ' + r.label })), af.rule, 'v', 'l') + '</select>' +
+      '<select id="as"><option value="">Every section</option>' +
+        opts(SECTIONS.map(s => ({ v: s.id, l: s.name })), af.section, 'v', 'l') + '</select>' +
+      '<button class="chipbtn' + (af.unread ? ' on' : '') + '" id="aunread">Unread only</button>' +
+      '<button class="chipbtn" id="aread">Mark all as read</button>' +
+      '<span class="spacer"></span>' +
+      '<a class="btn" href="#/rules" style="text-decoration:none">See the rules</a>' +
+    '</div>' +
+    '<div class="card" id="awrap"></div>';
+
+  $('#ar').onchange = e => { af.rule = e.target.value; paintAlerts(); };
+  $('#as').onchange = e => { af.section = e.target.value; paintAlerts(); };
+  $('#aunread').onclick = () => { af.unread = !af.unread; renderAlerts(); };
+  $('#aread').onclick = () => {
+    state.alerts.forEach(a => a.read = true); save(); paintChrome(); renderAlerts();
+    toast('All notifications marked as read.');
+  };
+  paintAlerts();
+}
+function paintAlerts() {
+  const list = state.alerts.filter(a =>
+    (!af.rule || a.rule === af.rule) &&
+    (!af.section || a.section === af.section) &&
+    (!af.unread || !a.read)
+  );
+  const shown = list.slice(0, 60);
+  if (!shown.length) { $('#awrap').innerHTML = '<div class="empty">Nothing matches those filters.</div>'; return; }
+
+  $('#awrap').innerHTML = '<div class="alist">' + shown.map((a, i) => {
+    const r = rule(a.rule);
+    const t = state.tickets.find(x => x.id === a.ticketId);
+    const ctx = { section: a.section, from: a.extra ? a.extra.from : null, assignee: t ? t.assignee : null };
+    const to = recipients(r, ctx).map(id => staff(id)).filter(Boolean);
+    const s = sec(a.section);
+    return '<div class="al' + (a.read ? '' : ' unread') + ' rowin" style="animation-delay:' + Math.min(i * 14, 260) + 'ms"' +
+      (t ? ' onclick="location.hash=\'#/t/' + t.id + '\'"' : '') + '>' +
+      '<div class="al-l"><span class="rulechip">' + esc(r.id) + '</span></div>' +
+      '<div class="al-m">' +
+        '<div class="al-t">' + esc(r.label) +
+          (a.priority === 'P1' ? ' ' + priPill('P1') : '') +
+          ' <span class="secpill sc-' + esc(s.id) + '">' + esc(s.short) + '</span></div>' +
+        '<div class="meta">' + esc(a.ref) + (t ? ' · ' + esc(cat(t.category).name) + ' · route ' + esc(t.routeNo) : '') +
+          (a.extra && a.extra.from ? ' · moved from ' + esc(sec(a.extra.from).name) : '') + '</div>' +
+        '<div class="al-to">' + (to.length
+            ? to.map(u => '<span class="who-chip"><span class="av" style="width:18px;height:18px;font-size:8px">' + u.initials + '</span>' + esc(u.name) + '</span>').join('')
+            : '<span class="lbl">nobody — no recipient exists on this case</span>') +
+          '<span class="lbl" style="margin-left:4px">· ' + esc(r.how) + '</span></div>' +
+      '</div>' +
+      '<div class="al-r mono">' + esc(ago(a.at)) + '</div></div>';
+  }).join('') + '</div>' +
+  (list.length > shown.length ? '<div class="hint" style="padding:12px 16px;border-top:1px solid var(--line)">Showing the most recent ' +
+    shown.length + ' of ' + list.length + '.</div>' : '');
+}
+
+/* ---------------- the rules themselves ----------------
+   The screen to put on the wall in the next meeting. Everything the
+   system decides on its own is written here as a sentence, so it can
+   be corrected by somebody who has never seen a database.
+   ------------------------------------------------------------------ */
+function renderRules() {
+  setHead('Routing and notification rules', 'What the system decides on its own, in plain words');
+
+  const routeRows = CATEGORIES.map(c => {
+    const s = sec(c.section), p = PRIORITIES[c.pri], h = staff(s.head);
+    const n = state.tickets.filter(t => t.category === c.id).length;
+    return '<tr>' +
+      '<td data-label="Subject chosen"><div class="sum">' + esc(c.name) + '</div>' +
+        '<div class="meta">' + n + ' in the last 21 days</div></td>' +
+      '<td data-label="Goes to"><span class="secpill sc-' + esc(s.id) + '">' + esc(s.short) + '</span> ' +
+        '<span style="font-size:12.5px">' + esc(s.name) + '</span></td>' +
+      '<td data-label="Landing with">' + (h ? avatar(h.id) : '<span class="lbl">—</span>') + '</td>' +
+      '<td data-label="Priority">' + priPill(c.pri) + '</td>' +
+      '<td data-label="Reply / settle" class="mono" style="font-size:11.5px;white-space:nowrap">' +
+        (p.respondH == null ? 'no clock' : p.respondH + 'h / ' + p.resolveH + 'h') + '</td></tr>';
+  }).join('');
+
+  $('#view').innerHTML =
+    '<div class="banner"><b>FOR MARKING UP</b><div>These two tables are the workflow. Nothing here is fixed — ' +
+      'they are a first proposal written from the way most operators work, and the point of putting them on a ' +
+      'screen is so SPTC can cross bits out. Every line lives in one file and takes minutes to change.</div></div>' +
+
+    card('Where a complaint goes', 'the subject decides',
+      /* the section names run long - "Operations and Scheduling" wrapped
+         under its own pill at 230px and made every Ops row two lines */
+      '<table class="tbl"><thead><tr><th>Subject chosen at intake</th><th style="width:272px">Goes straight to</th>' +
+      '<th style="width:186px">Landing with</th><th style="width:52px">Pri</th><th style="width:114px">Reply / settle</th>' +
+      '</tr></thead><tbody>' + routeRows + '</tbody></table>', true) +
+
+    '<div style="height:14px"></div>' +
+
+    card('Who is told, and when', NOTIFY_RULES.length + ' rules',
+      '<div class="rules">' + NOTIFY_RULES.map(r => {
+        const fired = state.alerts.filter(a => a.rule === r.id).length;
+        return '<div class="rule">' +
+          '<div class="rule-h"><span class="rulechip">' + esc(r.id) + '</span>' +
+            '<b>' + esc(r.label) + '</b>' +
+            '<span class="lbl">' + esc(ON_LABEL[r.on] || r.on) + (r.only ? ', ' + r.only + ' only' : '') + '</span>' +
+            '<span class="spacer"></span>' +
+            '<span class="lbl mono">' + fired + ' sent</span></div>' +
+          '<div class="rule-b">' + esc(r.what) + '</div>' +
+          '<div class="rule-w">' + (r.who || []).map(w =>
+            '<span class="who-chip">' + esc(WHO_LABEL[w] || w) + '</span>').join('') +
+            '<span class="lbl" style="margin-left:2px">· ' + esc(r.how) + '</span></div>' +
+        '</div>';
+      }).join('') + '</div>' +
+      '<div class="hint" style="margin-top:14px">Recipients are written as jobs rather than names, so a rule keeps ' +
+      'working when somebody leaves or is promoted. The person it resolves to today is shown against each ' +
+      'notification in the <a href="#/alerts">log</a>.</div>') +
+
+    '<div style="height:14px"></div>' +
+
+    card('What is not decided automatically', 'deliberately',
+      '<div class="notrules">' +
+      ['A case is never closed by the system. Somebody has to write what was done and put their name to it.',
+       'A case can always be moved by hand to another section, and the reason is required, kept and shown on the case.',
+       'A safety report is never routed anywhere but Safety, and never quietly downgraded.',
+       'Nobody on leave is given new work, however the rules would otherwise fall.',
+       'Customer Care keeps the passenger throughout. A section doing the work does not take the passenger with it.'
+      ].map(x => '<div class="nr">' + esc(x) + '</div>').join('') + '</div>');
+}
+const ON_LABEL = {
+  'logged': 'when a case is logged',
+  'due-soon': 'when the reply time is three quarters gone',
+  'breached': 'when a target is missed',
+  'redirected': 'when a case is moved between sections',
+  'resolved': 'when a case is settled'
+};
+
 /* ---------------- chrome ---------------- */
 function toast(msg, bad) {
   const el = document.createElement('div');
@@ -621,6 +1067,9 @@ function paintChrome() {
   const open = state.tickets.filter(isOpen);
   $('#ctQueue').textContent = open.length;
   $('#ctNew').textContent = state.tickets.filter(t => t.status === 'New').length;
+  const un = unreadAlerts();
+  const badge = $('#ctAlerts');
+  if (badge) { badge.textContent = un; badge.classList.toggle('hot', un > 0); }
 }
 function tick() {
   $('#clock').textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -628,6 +1077,10 @@ function tick() {
 
 function boot() {
   state = load();
+  /* A stored session from a build that had no notifications would
+     leave every rule with nowhere to write. Rebuild rather than
+     throw away the tickets somebody may have logged. */
+  if (!Array.isArray(state.alerts)) state.alerts = buildAlerts(state.tickets);
   document.documentElement.setAttribute('data-theme', state.theme || 'dark');
 
   document.querySelectorAll('#roleSeg button').forEach(b => b.onclick = () => {
