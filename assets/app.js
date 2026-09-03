@@ -20,8 +20,8 @@ function load() {
     }
   } catch (e) { /* fall through to a fresh seed */ }
   const tickets = buildSeed();
-  return { v: SEED_VERSION, tickets, alerts: buildAlerts(tickets), me: 'u6',
-           theme: 'hcis', brand: null, seq: 0, hr: buildHrSeed() };
+  return { v: SEED_VERSION, hrV: HR_SEED_VERSION, tickets, alerts: buildAlerts(tickets),
+           me: 'u6', theme: 'hcis', brand: null, seq: 0, hr: buildHrSeed() };
 }
 /* Saving used to swallow every error. That was harmless while the state
    was text, and stopped being harmless the moment photographs could be
@@ -1246,7 +1246,20 @@ function boot() {
   /* A session stored before the HR module existed has no hr branch, and
      every HR screen would read through undefined. Build it rather than
      throw away the cases somebody may have logged. */
-  if (!state.hr || !Array.isArray(state.hr.employees)) state.hr = buildHrSeed();
+  /* HR_SEED_VERSION existed from the start and gated NOTHING - it was
+     declared, exported and never compared against anything, so every
+     change to the shape of the HR sample data reached exactly nobody
+     who had already opened the page. A guard that cannot fire is worse
+     than no guard, because it is the reason you stop checking.
+
+     The HR branch is sample data, so rebuilding it on a version change
+     is the right answer, and it is what the Passenger Care side has
+     always done with SEED_VERSION. Cases logged in Passenger Care are
+     kept either way - the two versions are independent. */
+  if (!state.hr || !Array.isArray(state.hr.employees) || state.hrV !== HR_SEED_VERSION) {
+    state.hr = buildHrSeed();
+    state.hrV = HR_SEED_VERSION;
+  }
   /* The HR module grew a leave register, a disciplinary register,
      announcements and the two reference tables after the first build.
      A session stored before any one of those existed must gain it

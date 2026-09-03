@@ -23,7 +23,7 @@
    none of it came from SPTC.
    ================================================================== */
 
-const HR_SEED_VERSION = 2;
+const HR_SEED_VERSION = 3;
 
 /* --- the form itself ---------------------------------------------
    Section numbers and titles exactly as printed on PM/05, including
@@ -885,6 +885,64 @@ function buildLeave(rng, now, employees) {
                 'Insufficient notice.']) : ''
     });
   }
+  /* ---- leave people have already taken this year ----
+     Without this the register held about thirty applications and the
+     dashboard reported eleven hundred days owed across fifty-one
+     people - which is every single person's full entitlement still
+     outstanding in September. It adds up, it is internally consistent,
+     and it is obviously wrong to anybody who runs a depot: the whole
+     point of the untaken-leave figure is that it should be alarming
+     when it is high, and it cannot be if it is always the maximum.
+
+     So give most of the establishment some approved leave earlier in
+     the year, capped at their own entitlement so no balance can go
+     negative. */
+  const yStart = new Date(year, 0, 1).getTime();
+  employees.forEach((e, ei) => {
+    if (rng() < 0.10) return;                    /* some people genuinely have taken none */
+    const ent = leaveEntitlement(e, year).days;
+    if (ent < 4) return;                         /* joined too recently to have taken any */
+    /* By September somebody has usually taken between a quarter and
+       four-fifths of the year's leave. Anything much outside that and
+       the untaken-leave figure stops telling anybody anything. */
+    let budget = Math.min(ent - 1, Math.round(ent * (0.30 + rng() * 0.50)));
+    let guard = 0;
+    while (budget >= 2 && guard++ < 4) {
+      /* clamp the block to what is left rather than abandoning the
+         budget when a long block does not fit */
+      const length = Math.max(2, Math.min(budget, 2 + Math.floor(rng() * 8)));
+      /* somewhere between the start of the year and a month ago */
+      const span = Math.max(1, Math.floor((now - 30 * DAY - yStart) / DAY));
+      let from = new Date(yStart + Math.floor(rng() * span) * DAY);
+      from.setHours(12, 0, 0, 0);
+      let end = addDays(from, length - 1);
+      let w = workingDays(from.getTime(), end.getTime());
+      let nudge = 0;
+      while (w.days < 1 && nudge++ < 10) {
+        from = addDays(from, 1); end = addDays(from, length - 1);
+        w = workingDays(from.getTime(), end.getTime());
+      }
+      if (w.days < 1 || w.days > budget) break;
+      const applied = from.getTime() - (5 + Math.floor(rng() * 25)) * DAY;
+      const head = heads[e.section] || employees.find(x => x.position === 'HR Director');
+      out.push({
+        id: 'LV-' + (year * 1000 + 200 + out.length + ei),
+        empNo: e.empNo, year, type: 'annual', status: 'approved',
+        appliedAt: Math.round(Math.max(yStart - 20 * DAY, applied)),
+        from: from.getTime(), to: end.getTime(),
+        days: w.days, weekendDays: w.weekend, holidays: w.holidays,
+        overseas: false, overseasAddress: '',
+        reason: pick(['Family time.', 'Rest.', 'Travelling to see family.',
+                      'Personal matters.', 'Building work at home.']),
+        medical: null, hardCopy: null,
+        decidedBy: head ? head.empNo : null,
+        decidedAt: Math.round(applied + (1 + rng() * 3) * DAY),
+        decisionNote: ''
+      });
+      budget -= w.days;
+    }
+  });
+
   /* overseas address only where it is actually overseas */
   out.forEach(l => {
     if (l.overseas) l.overseasAddress = pick([
