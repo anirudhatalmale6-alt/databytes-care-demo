@@ -73,13 +73,19 @@ original **control room** in dark and light. The control-room looks are
 denser and were built for a projector; they are kept because a meeting room
 is unpredictable.
 
-**Brand colour.** SPTC's own colours are not in this yet. Rather than guess
-them, the brand colour is a single value driving the rail header, the active
-menu item, primary buttons, avatars, focus rings and the chart bars, with a
-picker at the bottom of the rail. One click recolours the interface, which
-answers "will it be in our colours" in the room instead of in a follow-up
-email. When the logo arrives its hex becomes the default and the picker can
-go.
+**Brand colour.** Read out of SPTC's own logo file, not chosen: their mark
+carries the Seychelles flag palette — blue `#2d3283`, green `#049351`, red
+`#ed1b24`, yellow `#fcdb2e`, on black `#211f20`. The blue is the default
+because it is the one of the four that works as an interface colour, and it
+happens to sit comfortably against the HCIS navy rail.
+
+That one value drives the rail header, the active menu item, primary buttons,
+avatars, focus rings and the chart bars. All four logo colours are in a
+picker at the bottom of the rail, so the interface can be recoloured in front
+of the customer rather than in a follow-up email.
+
+Their red is in the picker but is worth avoiding as the house colour: past
+target is also red, and the two would be hard to tell apart on a busy board.
 
 The text colour that sits on the brand is not a guess either: it is chosen by
 comparing the contrast of white and near-black against the chosen colour and

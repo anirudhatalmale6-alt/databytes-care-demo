@@ -78,7 +78,7 @@
   --ocean:#0da1ad; --violet:#8f47f0;
   --shadow:0 1px 2px rgba(16,24,40,.04),0 6px 18px -8px rgba(16,24,40,.12);
   --r:10px;
-  --brand:#2563eb; --brand-ink:#ffffff;
+  --brand:#2d3283; --brand-ink:#ffffff;   /* SPTC blue, read out of their logo */
   --rail-bg:#1d2a45; --rail-txt:#f2f6fb; --rail-dim:#a7b3c9; --rail-faint:#78859e;
   --rail-line:rgba(255,255,255,.09); --rail-line-2:rgba(255,255,255,.16);
   --rail-on:#313c56; --rail-hover:#26324c;
@@ -118,11 +118,12 @@ a{color:inherit}
   background:var(--brand-head);color:var(--brand-head-ink)}
 .brand::after{content:'';position:absolute;left:16px;right:16px;bottom:-1px;height:1px;
   background:linear-gradient(90deg,var(--brand),transparent)}
-.brand .bmark{width:34px;height:34px;flex:none;border-radius:9px;display:grid;place-items:center;
-  background:color-mix(in srgb,var(--brand) 22%,transparent);
-  border:1px solid color-mix(in srgb,var(--brand) 45%,transparent)}
-.brand .bmark svg{width:19px;height:19px;stroke:var(--brand);fill:none;stroke-width:1.7;
-  stroke-linecap:round}
+/* SPTC's mark is a full-colour roundel on white. It needs a white disc
+   under it or the navy and the blue band eat the black lettering. */
+.brand .bmark{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:#fff;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.35),0 1px 3px rgba(0,0,0,.25)}
+.brand .bmark img{width:36px;height:36px;display:block;object-fit:contain}
 .brand .btxt{min-width:0}
 .brand b{display:block;font-size:15px;font-weight:700;letter-spacing:-.015em}
 .brand span{display:block;font-size:10px;letter-spacing:.13em;text-transform:uppercase;
@@ -130,9 +131,6 @@ a{color:inherit}
 
 /* on the blue header band the mark and the strapline are white, not brand */
 :root[data-theme=hcis] .brand::after{background:none}
-:root[data-theme=hcis] .brand .bmark{background:color-mix(in srgb,currentColor 18%,transparent);
-  border-color:color-mix(in srgb,currentColor 32%,transparent)}
-:root[data-theme=hcis] .brand .bmark svg{stroke:currentColor}
 :root[data-theme=hcis] .brand span{color:color-mix(in srgb,currentColor 70%,transparent)}
 
 .nav{padding:12px 10px;flex:1;overflow:auto}
