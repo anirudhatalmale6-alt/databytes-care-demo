@@ -21,7 +21,7 @@ function load() {
   } catch (e) { /* fall through to a fresh seed */ }
   const tickets = buildSeed();
   return { v: SEED_VERSION, tickets, alerts: buildAlerts(tickets), me: 'u6',
-           theme: 'hcis', brand: null, seq: 0 };
+           theme: 'hcis', brand: null, seq: 0, hr: buildHrSeed() };
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
 function reset() {
@@ -174,7 +174,25 @@ function router() {
   const h = location.hash || '#/dashboard';
   const parts = h.replace('#/', '').split('/');
   const view = parts[0] || 'dashboard';
-  document.querySelectorAll('.nav a').forEach(a =>
+
+  /* Two modules share one shell. Which one is showing is derived from the
+     address, not held in a variable, so a pasted link always lands in the
+     right module with the right menu beside it. */
+  const mod = view === 'hr' ? 'hr' : 'care';
+  document.documentElement.setAttribute('data-mod', mod);
+  document.querySelectorAll('#modsw a').forEach(a =>
+    a.classList.toggle('on', a.dataset.mod === mod));
+
+  if (mod === 'hr') {
+    const sub = '#/' + ['hr'].concat(parts[1] ? [parts[1]] : []).join('/');
+    document.querySelectorAll('.navset[data-mod=hr] a').forEach(a =>
+      a.classList.toggle('on', a.getAttribute('href') === sub));
+    hrRoute(parts.slice(1));
+    window.scrollTo(0, 0);
+    return;
+  }
+
+  document.querySelectorAll('.navset[data-mod=care] a').forEach(a =>
     a.classList.toggle('on', a.getAttribute('href') === '#/' + view));
   if (view === 'queue')          renderQueue();
   else if (view === 't')         renderTicket(parts[1]);
@@ -271,7 +289,11 @@ const KPI_ICONS = {
          '<path d="M3 13h5l1.5 3h5L16 13h5"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.2 2"/>',
   check: '<circle cx="12" cy="12" r="8.5"/><path d="M8.4 12.2l2.5 2.5 4.7-5"/>',
-  trend: '<path d="M3.5 16.5l5.5-5.5 3.5 3.5 7-7"/><path d="M14 7.5h5.5V13"/>'
+  trend: '<path d="M3.5 16.5l5.5-5.5 3.5 3.5 7-7"/><path d="M14 7.5h5.5V13"/>',
+  people: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/>' +
+          '<circle cx="17" cy="9.5" r="2.4"/><path d="M15 15.4a4.4 4.4 0 0 1 5.5 4.1"/>',
+  doc: '<path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>' +
+       '<path d="M14 3v4h4"/><line x1="8.5" y1="13" x2="15.5" y2="13"/>'
 };
 function kpi(label, n, d, colorVar, dl, icon) {
   return '<div class="card kpi" style="--k:var(' + colorVar + ')">' +
@@ -1137,6 +1159,17 @@ function paintChrome() {
   }
   const bb = $('#bellBtn');
   if (bb) bb.classList.toggle('here', (location.hash || '').indexOf('/alerts') !== -1);
+
+  if (state.hr) {
+    const set = (id, n, hot) => {
+      const el = $(id);
+      if (el) { el.textContent = n; el.classList.toggle('hot', !!hot); }
+    };
+    set('#ctStaff', activeEmployees().length);
+    set('#ctVac', state.hr.vacancies.reduce((n, v) => n + v.posts, 0));
+    const unopened = state.hr.applications.filter(a => a.status === 'received').length;
+    set('#ctApps', unopened, unopened > 0);
+  }
 }
 function tick() {
   $('#clock').textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1148,6 +1181,10 @@ function boot() {
      leave every rule with nowhere to write. Rebuild rather than
      throw away the tickets somebody may have logged. */
   if (!Array.isArray(state.alerts)) state.alerts = buildAlerts(state.tickets);
+  /* A session stored before the HR module existed has no hr branch, and
+     every HR screen would read through undefined. Build it rather than
+     throw away the cases somebody may have logged. */
+  if (!state.hr || !Array.isArray(state.hr.employees)) state.hr = buildHrSeed();
   /* 'hcis' is the default look: the client asked for this to match the other
      product he sells. Anyone carrying a stored 'dark' or 'light' from an
      earlier build keeps it - it is a preference, not a defect. */

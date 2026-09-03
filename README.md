@@ -1,9 +1,79 @@
-# SPTC Passenger Care — working demonstration
+# SPTC — working demonstration
 
-Prepared for DataBytes Consulting. A clickable customer care and complaints
-system for a bus operator, built to be shown in a meeting.
+Prepared for DataBytes Consulting. Two modules of one system for a bus
+operator, built to be shown in a meeting:
+
+- **Passenger Care** — complaints in, routed to the section that resolves
+  them, answered inside an agreed time.
+- **Human Resources** — the establishment register, and recruitment on
+  Form PM/05.
+
+They share one shell, one menu and one look on purpose. "Centralised ERP"
+is a claim; a module switch that keeps everything else identical is the
+demonstration of it.
 
 **Live:** https://anirudhatalmale6-alt.github.io/databytes-care-demo/
+
+---
+
+## Human Resources
+
+### Form PM/05 is the spine
+
+`PM/05 (Annex 5)` is the **Government of Seychelles Employment Application
+Form**, used across the Seychelles Public Service — it is not SPTC's own
+form. Building to it means the module fits any ministry or parastatal that
+uses PM/05, not only this customer.
+
+All fourteen numbered sections are reproduced, in the order the paper form
+prints them, with the same section numbers, so somebody working from a
+completed sheet can go straight down it.
+
+Two things to say plainly about that form:
+
+- **It is an application, not an employee record.** It describes somebody
+  who wants a job. An employee record needs a dozen fields the form has no
+  box for — employee number, date joined, the grade actually awarded,
+  section, reporting line, leave entitlement, Pension Fund number, bank
+  details, probation or confirmed. Those live on the employee side and are
+  labelled *not on the application form* on screen.
+- **Its section 15 is its section 14 again.** The whole block, including
+  the declaration above it, is printed twice. It looks like a copy and
+  paste when the form was drawn up in Word in 2017. It is shown once here,
+  with a note.
+
+### What it does
+
+- **Register** of the establishment, filterable by section, grade and
+  status, searchable by name, number, position or identity number.
+- **Employee record** — the employment side, then the PM/05 side: personal
+  details, education and training, languages, driving licences, employment
+  before joining, next of kin.
+- **Vacancies**, with the count of applications each has attracted and how
+  many nobody has opened yet.
+- **Applications** through their stages: received, shortlisted,
+  interviewed, offered, hired, not taken forward.
+- **Hiring** an applicant creates the employee record *from the form*.
+  Nothing is typed twice — that is the only honest reason to capture
+  fourteen sections at intake.
+
+### Two things it checks that paper cannot
+
+- A Seychelles **National Identity Number encodes the date of birth** in
+  its first six digits. The form checks the two against each other and asks
+  before saving a pair that disagrees. It is the cheapest possible catch
+  for a mistyped number, and it is a rule the registry already applies.
+- **Leave entitlement is computed, not typed** — 21 days by statute plus
+  one for every five years of service — so the number can never drift away
+  from the service it is based on.
+
+### Invented, and where the figures are not real
+
+Every person, identity number, telephone number, bank detail and salary
+figure in the HR module is invented. **The salary grade bands are a
+plausible shape, not the published public service scale**, and must be
+replaced before anybody quotes a figure from those screens. A banner on the
+HR dashboard says so.
 
 ---
 
