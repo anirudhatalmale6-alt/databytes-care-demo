@@ -67,6 +67,102 @@ Two things to say plainly about that form:
   one for every five years of service — so the number can never drift away
   from the service it is based on.
 
+### Leave, and the arithmetic that has to be right
+
+`LEAVE APPLICATION MODULE` in the specification, plus the medical block
+it carries. Three decisions in it are worth stating, because each one is
+a way a real system quietly gets somebody's leave wrong:
+
+- **Days are counted from the dates, never typed.** Weekends and
+  Seychelles public holidays are skipped. A Friday-to-Monday request is
+  **two** days, not four, and the week containing Independence Day is
+  four days, not five. A typed "number of days requesting" field
+  disagrees with its own dates eventually, and the disagreement is
+  invisible.
+- **The balance moves on APPROVAL, not on submission.** The
+  specification says days remaining is calculated from days *requested*.
+  Doing it that way means a declined or cancelled application has
+  already eaten the entitlement, and nobody finds out until somebody is
+  refused leave they are owed. Pending days are shown separately —
+  "if everything pending is approved this becomes N" — so the supervisor
+  still sees what is coming.
+- **Entitlement is pro-rated in the joining year.** "Auto calculate from
+  the date joined" hides two rules: service raises the entitlement
+  (21 days plus one for every five years, capped at five), and *when* in
+  the year somebody joined lowers it. Somebody who started in October
+  has not earned twenty-one days by December. That second rule is the
+  one normally missed, and it is the one that causes the argument in
+  January.
+
+Only a supervisor or manager can approve or decline — the Agent /
+Supervisor switch in the top bar demonstrates it. Public holidays are on
+the **Tables** screen; the movable feasts are *computed* from Easter, so
+the table is right for any year. **The fixed dates are my list, not a
+gazette** — confirm them before a balance is relied on.
+
+### Discipline
+
+The identity number is the way in: type it and the photograph, name,
+department and position appear. Nothing about the person is retyped onto
+a disciplinary record, and it is the cheapest guard against a warning
+letter being filed against the wrong member of staff. A record is never
+deleted — a withdrawn allegation is marked withdrawn.
+
+### Announcements
+
+The audience is stored as a **rule** — all staff, named departments, or
+named people — and not as a frozen list of names, so a notice addressed
+to Operations reaches whoever is in Operations on the day it goes out.
+The recipient count is worked out live, before it is saved. Nothing is
+actually sent; there is no server to send it from, and the screen says
+so.
+
+### The two reference tables
+
+`Department` and `Position`, as the specification asks. The department
+table is also **the join between the two modules**: Passenger Care routes
+a complaint to a department and HR employs people into the same one. One
+list, maintained in one place.
+
+- Closing a department that still has people or open cases in it is
+  **refused**, with the counts, because closing it would leave them
+  pointing at somewhere that no longer accepts work.
+- A closed department stops being offered when a case is routed, but is
+  still *shown* on the cases already in it. An old case labelled with a
+  closed department is honest; one labelled `undefined` is not.
+- Position codes are generated and forced unique. Two positions sharing
+  a code is what sends a payroll line to the wrong cost centre, and
+  nothing on screen would ever show it.
+
+### Pay: gross and net are two numbers
+
+The specification has one field, "Gross net". Gross is basic plus
+allowances; net is gross less deductions, and nothing can work out net
+without knowing which deductions apply. Both are shown as separate
+lines. **The deduction rates are placeholders** — the income tax bands
+and the Pension Fund rate must be confirmed.
+
+Basic salary, monthly hours and rate per hour are three numbers that can
+contradict each other, so only two are inputs: the **hourly rate is
+derived** from basic pay and hours. If SPTC sets the hourly rate and
+works the salary out from it, `payBreakdown()` in `assets/hr-data.js` is
+the one calculation to turn around.
+
+### Photographs and documents
+
+A photograph is shrunk in the browser to 160×160 before it is kept, and
+is really there on the next screen and after a refresh. **Any other file
+is recorded by name, type and size, and the bytes are not kept** — there
+is no server to keep them in, and storing scanned PDFs for fifty
+employees would fill the few megabytes of local storage a browser gives
+a page and lose the whole session.
+
+Saving now *reports* a storage failure rather than swallowing it. That
+mattered less when the state was text; with photographs in it, a save
+that quietly fails leaves the screen looking correct while nothing has
+been written, and the first anybody knows is a refresh in the middle of
+a meeting.
+
 ### Invented, and where the figures are not real
 
 Every person, identity number, telephone number, bank detail and salary
@@ -194,6 +290,11 @@ room wifi does not.
 | **The sections themselves, and who heads them** | `SECTIONS`, `assets/data.js` |
 | **Who is notified, and when** | `NOTIFY_RULES`, `assets/data.js` |
 | Screens and behaviour | `assets/app.js` |
+| **Departments and positions** | the **Tables** screen, on screen — no code |
+| **Public holidays** | `FIXED_HOLIDAYS`, `assets/hr-data.js` |
+| **Leave types and what deducts** | `LEAVE_TYPES`, `assets/hr-data.js` |
+| **Allowances and deductions** | `ALLOWANCES` and `DEDUCTIONS`, `assets/hr-data.js` |
+| **Salary grade bands** | `GRADES`, `assets/hr-data.js` — currently invented |
 | Appearance, all three looks | `assets/app.css` |
 | **The brand colour, once SPTC's is known** | `--brand` in `:root[data-theme=hcis]`, `assets/app.css` |
 | The five colours in the picker | `data-brand` on the buttons in `index.html` |
@@ -210,9 +311,13 @@ State is kept in the browser's local storage, so anything logged during a
 meeting survives a refresh. **Reset the demonstration** in the bottom left
 puts it back to the starting data.
 
-`SEED_VERSION` in `data.js` must be incremented whenever the sample data
-changes shape, otherwise anyone who has opened an earlier build keeps the old
-data in their browser and never sees the correction.
+`SEED_VERSION` in `data.js` and `HR_SEED_VERSION` in `hr-data.js` must be
+incremented whenever the sample data changes shape, **and the `?v=` on
+every asset in `index.html` bumped with them** — GitHub Pages serves
+`max-age=600`, so a guard inside a cached file can never fire. They
+change together or not at all. Otherwise anyone who has opened an
+earlier build otherwise anyone who has opened an keeps the old data in their browser and never sees the
+correction.
 
 ## What this is not
 

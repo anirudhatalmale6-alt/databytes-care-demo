@@ -23,7 +23,44 @@ function load() {
   return { v: SEED_VERSION, tickets, alerts: buildAlerts(tickets), me: 'u6',
            theme: 'hcis', brand: null, seq: 0, hr: buildHrSeed() };
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+/* Saving used to swallow every error. That was harmless while the state
+   was text, and stopped being harmless the moment photographs could be
+   attached to a record: local storage is capped at a few megabytes, and
+   a save that quietly fails leaves the screen looking correct while
+   nothing has been written. The first anybody knows is a refresh in the
+   middle of a meeting with the morning's work gone.
+
+   So: report it, and say which one it was. A quota failure is the
+   user's problem to act on (remove a photo, or reset), and it is not
+   the same as the browser refusing storage outright. */
+let saveWarned = false;
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    saveWarned = false;
+    return true;
+  } catch (e) {
+    const quota = e && (e.name === 'QuotaExceededError' ||
+      e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22);
+    if (!saveWarned) {
+      saveWarned = true;
+      if (typeof toast === 'function') {
+        toast(quota
+          ? 'Out of browser storage — that change is on screen but has NOT been saved. Remove a photograph, or reset the demonstration.'
+          : 'This browser is refusing to store anything. Changes will be lost on refresh.', true);
+      }
+    }
+    return false;
+  }
+}
+/* How close to the ceiling we are. Shown on the documents panel so the
+   problem is visible before it bites rather than after. */
+function storageUsed() {
+  try {
+    const bytes = new Blob([JSON.stringify(state)]).size;
+    return { bytes, kb: Math.round(bytes / 1024), pct: Math.min(100, Math.round(bytes / (5 * 1024 * 1024) * 100)) };
+  } catch (e) { return { bytes: 0, kb: 0, pct: 0 }; }
+}
 function reset() {
   if (!confirm('Reset the demonstration back to its starting data?\n\nAnything logged or changed during this session will be discarded.')) return;
   localStorage.removeItem(KEY);
@@ -41,7 +78,17 @@ const staff = id => STAFF.find(s => s.id === id) || null;
 const route = no => ROUTES.find(r => r.no === no) || { no, name: '' };
 const me = () => staff(state.me);
 const isOpen = t => OPEN_STATUSES.includes(t.status);
-const sec = id => SECTIONS.find(s => s.id === id) || { id: id, name: id, short: id, head: null, what: '' };
+/* One department list, two modules. Passenger Care routes a complaint
+   to a department; HR employs people into the same department. The
+   list lives in HR because that is where somebody maintains it.
+
+   sec() searches ALL departments including retired ones, because a
+   case logged two years ago can point at a department that has since
+   been closed and "undefined" on an old case is worse than a label
+   saying the department is closed. Pickers use secList(), which only
+   offers the ones still open. */
+const sec = id => allDepartments().find(s => s.id === id) ||
+  { id: id, name: id, short: id, head: null, what: '', active: false };
 const secOf = t => sec(t.section || cat(t.category).section);
 const rule = id => NOTIFY_RULES.find(r => r.id === id) || { id: id, label: id, who: [], how: '', what: '' };
 
@@ -293,7 +340,8 @@ const KPI_ICONS = {
   people: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/>' +
           '<circle cx="17" cy="9.5" r="2.4"/><path d="M15 15.4a4.4 4.4 0 0 1 5.5 4.1"/>',
   doc: '<path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>' +
-       '<path d="M14 3v4h4"/><line x1="8.5" y1="13" x2="15.5" y2="13"/>'
+       '<path d="M14 3v4h4"/><line x1="8.5" y1="13" x2="15.5" y2="13"/>',
+  flag: '<path d="M5.5 21V4"/><path d="M5.5 4.8h11l-2.2 4 2.2 4h-11z"/>'
 };
 function kpi(label, n, d, colorVar, dl, icon) {
   return '<div class="card kpi" style="--k:var(' + colorVar + ')">' +
@@ -358,7 +406,7 @@ function workload(open) {
 /* open cases per section, with the late ones called out - the number a
    section head is judged on, not the total */
 function sectionBars(open) {
-  const rows = SECTIONS.map(s => {
+  const rows = secList().map(s => {
     const mine = open.filter(t => secOf(t).id === s.id);
     return { s, n: mine.length, bad: mine.filter(t => sla(t).breached).length };
   }).sort((a, b) => b.n - a.n);
@@ -473,7 +521,7 @@ function renderQueue() {
         '<option value="">Every status</option>' + opts(STATUSES.map(s => ({ v: s, l: s })), qf.status, 'v', 'l') + '</select>' +
       '<select id="fc"><option value="">Every subject</option>' + opts(CATEGORIES.map(c => ({ v: c.id, l: c.name })), qf.cat, 'v', 'l') + '</select>' +
       '<select id="fr"><option value="">Every route</option>' + opts(ROUTES.map(r => ({ v: r.no, l: 'Route ' + r.no })), qf.route, 'v', 'l') + '</select>' +
-      '<select id="fsec"><option value="">Every section</option>' + opts(SECTIONS.map(s => ({ v: s.id, l: s.name })), qf.section, 'v', 'l') + '</select>' +
+      '<select id="fsec"><option value="">Every section</option>' + opts(secList().map(s => ({ v: s.id, l: s.name })), qf.section, 'v', 'l') + '</select>' +
       '<button class="chipbtn' + (qf.mine ? ' on' : '') + '" id="fmine">Assigned to me</button>' +
       '<button class="chipbtn" id="fclear">Clear</button>' +
       '<span class="spacer"></span>' +
@@ -590,7 +638,14 @@ function sectionPanel(t) {
   if (isOpen(t)) {
     html += '<div class="frm" style="margin-top:12px">' +
       '<label><span class="lbl">Send it somewhere else</span><select id="secsel">' +
-      SECTIONS.map(x => '<option value="' + x.id + '"' + (x.id === s.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') +
+      /* The case's OWN department has to be in this list even if it has
+         since been closed. Offering only the open ones would leave
+         nothing selected, and the first option in the list would then
+         become the answer the moment somebody pressed save - a silent
+         redirect nobody asked for. */
+      (secList().some(x => x.id === s.id) ? secList() : secList().concat([sec(s.id)]))
+        .map(x => '<option value="' + x.id + '"' + (x.id === s.id ? ' selected' : '') + '>' +
+          esc(x.name) + (x.active === false ? ' (closed)' : '') + '</option>').join('') +
       '</select></label>' +
       (t.priority === 'P1' ? '<div class="hint">This is a safety report. Moving it out of Safety and Compliance is possible but is recorded and notified upwards.</div>'
                            : '<div class="hint">A reason is required, and both section heads are told.</div>') +
@@ -796,7 +851,7 @@ function renderNew() {
           : '<span class="lbl auto hand">overridden by hand</span>') + '</div>' +
       '<div class="rb-mid">' +
         '<span class="secpill sc-' + esc(s.id) + '">' + esc(s.short) + '</span>' +
-        '<select id="n_sec">' + SECTIONS.map(x => '<option value="' + x.id + '"' +
+        '<select id="n_sec">' + secList().map(x => '<option value="' + x.id + '"' +
             (x.id === s.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select>' +
       '</div>' +
       (h ? '<div class="hint">Lands with ' + esc(h.name) + ', ' + esc(h.title) + '.</div>' : '') +
@@ -909,7 +964,7 @@ function renderRoutes() {
 function renderSections() {
   setHead('By section', 'Where the work has been sent, and whether it is moving');
   const T = state.tickets;
-  const rows = SECTIONS.map(s => {
+  const rows = secList().map(s => {
     const all = T.filter(t => secOf(t).id === s.id);
     const open = all.filter(isOpen);
     const late = open.filter(t => sla(t).breached);
@@ -961,7 +1016,7 @@ function renderAlerts() {
       '<select id="ar"><option value="">Every rule</option>' +
         opts(NOTIFY_RULES.map(r => ({ v: r.id, l: r.id + ' — ' + r.label })), af.rule, 'v', 'l') + '</select>' +
       '<select id="as"><option value="">Every section</option>' +
-        opts(SECTIONS.map(s => ({ v: s.id, l: s.name })), af.section, 'v', 'l') + '</select>' +
+        opts(secList().map(s => ({ v: s.id, l: s.name })), af.section, 'v', 'l') + '</select>' +
       '<button class="chipbtn' + (af.unread ? ' on' : '') + '" id="aunread">Unread only</button>' +
       '<button class="chipbtn" id="aread">Mark all as read</button>' +
       '<span class="spacer"></span>' +
@@ -1169,6 +1224,13 @@ function paintChrome() {
     set('#ctVac', state.hr.vacancies.reduce((n, v) => n + v.posts, 0));
     const unopened = state.hr.applications.filter(a => a.status === 'received').length;
     set('#ctApps', unopened, unopened > 0);
+    /* Both of these count what somebody has to DO, not how many rows
+       exist. A badge showing the size of a table is decoration; a badge
+       showing the size of a queue is the reason to look at the screen. */
+    const waiting = (state.hr.leave || []).filter(l => l.status === 'submitted').length;
+    set('#ctLeave', waiting, waiting > 0);
+    const openDisc = (state.hr.discipline || []).filter(d => d.outcome === 'open').length;
+    set('#ctDisc', openDisc, openDisc > 0);
   }
 }
 function tick() {
@@ -1185,6 +1247,37 @@ function boot() {
      every HR screen would read through undefined. Build it rather than
      throw away the cases somebody may have logged. */
   if (!state.hr || !Array.isArray(state.hr.employees)) state.hr = buildHrSeed();
+  /* The HR module grew a leave register, a disciplinary register,
+     announcements and the two reference tables after the first build.
+     A session stored before any one of those existed must gain it
+     without losing the rest - one missing branch would otherwise take
+     down every HR screen, and the symptom would look like a blank
+     module rather than an old save.
+
+     Each branch is checked on its own. Gating the lot behind a single
+     sentinel is how a half-applied upgrade happens. */
+  (function fillHrBranches() {
+    const h = state.hr;
+    const fresh = () => (fillHrBranches.seed || (fillHrBranches.seed = buildHrSeed()));
+    if (!Array.isArray(h.departments)) h.departments = buildDepartments();
+    if (!Array.isArray(h.positions))   h.positions = buildPositions();
+    if (!Array.isArray(h.leave))       h.leave = fresh().leave;
+    if (!Array.isArray(h.discipline))  h.discipline = fresh().discipline;
+    if (!Array.isArray(h.announcements)) h.announcements = fresh().announcements;
+    if (typeof h.leaveSeq !== 'number') h.leaveSeq = h.leave.length;
+    if (typeof h.discSeq !== 'number')  h.discSeq = 0;
+    if (typeof h.annSeq !== 'number')   h.annSeq = 0;
+    h.employees.forEach(e => {
+      if (!Array.isArray(e.dependants)) e.dependants = [];
+      if (!Array.isArray(e.documents))  e.documents = [];
+      if (!Array.isArray(e.allowances)) e.allowances = [];
+      if (e.photo === undefined) e.photo = null;
+      if (!e.positionCode) {
+        const p = h.positions.find(x => x.title === e.position);
+        e.positionCode = p ? p.code : null;
+      }
+    });
+  })();
   /* 'hcis' is the default look: the client asked for this to match the other
      product he sells. Anyone carrying a stored 'dark' or 'light' from an
      earlier build keeps it - it is a preference, not a defect. */

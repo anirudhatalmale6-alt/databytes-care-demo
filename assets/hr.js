@@ -69,6 +69,13 @@ function hrRoute(parts) {
   else if (v === 'apps')   renderApplications();
   else if (v === 'a')      renderApplication(parts[1]);
   else if (v === 'apply')  renderApplyForm();
+  else if (v === 'leave')  { parts[1] === 'new' ? renderLeaveForm(parts[2]) : renderLeave(); }
+  else if (v === 'l')      renderLeaveRecord(parts[1]);
+  else if (v === 'disc')   { parts[1] === 'new' ? renderDiscForm() : renderDiscipline(); }
+  else if (v === 'd')      renderDiscRecord(parts[1]);
+  else if (v === 'notices'){ parts[1] === 'new' ? renderAnnForm() : renderAnnouncements(); }
+  else if (v === 'n')      renderAnnouncement(parts[1]);
+  else if (v === 'tables') renderTables();
   else                     renderHrDashboard();
 }
 
@@ -80,7 +87,7 @@ function renderHrDashboard() {
   const posts = state.hr.vacancies.reduce((n, v) => n + v.posts, 0);
   const toReview = state.hr.applications.filter(a => a.status === 'received');
 
-  const bySec = SECTIONS.map(s => ({ name: s.name, n: E.filter(e => e.section === s.id).length }))
+  const bySec = secList().map(s => ({ name: s.name, n: E.filter(e => e.section === s.id).length }))
     .sort((a, b) => b.n - a.n);
   const byGrade = GRADES.map(g => ({ name: g.sg + ' — ' + g.note, n: E.filter(e => e.sg === g.sg).length }))
     .filter(r => r.n).sort((a, b) => b.n - a.n);
@@ -89,8 +96,15 @@ function renderHrDashboard() {
 
   /* Untaken leave is a liability the finance side has to carry, and it
      is the number an HR manager is asked for that nobody can ever
-     produce quickly. It falls straight out of the register. */
-  const owed = E.reduce((n, e) => n + Math.max(0, e.leaveEntitlement - e.leaveTaken), 0);
+     produce quickly. It falls straight out of the register - and now
+     out of the approved leave applications, rather than out of a field
+     somebody typed. */
+  const bals = E.map(e => leaveBalance(e));
+  const owed = bals.reduce((n, b) => n + Math.max(0, b.remaining), 0);
+  const pendingLeave = (state.hr.leave || []).filter(l => l.status === 'submitted');
+  const outToday = (state.hr.leave || []).filter(l =>
+    l.status === 'approved' && l.from <= Date.now() && l.to >= Date.now());
+  const openDisc = (state.hr.discipline || []).filter(d => d.outcome === 'open');
 
   $('#view').innerHTML =
     hrBanner() +
@@ -107,10 +121,21 @@ function renderHrDashboard() {
         '<div class="gauge"><div><div class="big">' + owed + '</div>' +
         '<div class="sm">days owed and not taken</div>' +
         '<div class="sm" style="margin-top:9px">' +
-        E.filter(e => e.leaveEntitlement - e.leaveTaken > 15).length +
+        bals.filter(b => b.remaining > 15).length +
         ' people carrying more than 15 days</div>' +
-        '<div class="sm" style="margin-top:9px">Entitlement is 21 days, plus one for every ' +
-        'five years of service.</div></div></div>') +
+        '<div class="sm" style="margin-top:9px">21 days by statute, plus one for every five years of ' +
+        'service, pro-rated in the year somebody joins.</div>' +
+        '<div class="sm" style="margin-top:9px">' + outToday.length + ' on approved leave today.</div>' +
+        '</div></div>') +
+    '</div>' +
+
+    '<div class="grid k4" style="margin-bottom:14px">' +
+      kpi('Leave to decide', pendingLeave.length, 'applications awaiting a supervisor',
+          pendingLeave.length ? '--coral' : '--teal', null, 'clock') +
+      kpi('Off today', outToday.length, 'approved leave running now', '--blue', null, 'people') +
+      kpi('Discipline open', openDisc.length, 'no outcome recorded yet',
+          openDisc.length ? '--amber' : '--teal', null, 'flag') +
+      kpi('Announcements', (state.hr.announcements || []).length, 'notices on file', '--ocean', null, 'doc') +
     '</div>' +
 
     '<div class="grid k2" style="margin-bottom:14px">' +
@@ -118,7 +143,7 @@ function renderHrDashboard() {
       card('Recently joined', 'newest first',
         '<table class="tbl"><tbody>' + joiners.map(e =>
           '<tr onclick="location.hash=\'#/hr/p/' + e.empNo + '\'">' +
-          '<td>' + empAv(e, 26) + '</td>' +
+          '<td>' + empFace(e, 26) + '</td>' +
           '<td><div class="sum">' + esc(fullName(e)) + '</div>' +
           '<div class="meta">' + esc(e.position) + '</div></td>' +
           '<td style="text-align:right"><div>' + hrDate(e.joined) + '</div>' +
@@ -145,7 +170,7 @@ function renderPeople() {
     '<div class="filters">' +
       '<input type="search" id="pq" placeholder="Name, employee number, position" value="' + esc(pf.q) + '">' +
       '<select id="psec"><option value="">Every section</option>' +
-        SECTIONS.map(s => '<option value="' + s.id + '"' + (pf.sec === s.id ? ' selected' : '') + '>' +
+        secList().map(s => '<option value="' + s.id + '"' + (pf.sec === s.id ? ' selected' : '') + '>' +
           esc(s.name) + '</option>').join('') + '</select>' +
       '<select id="pst"><option value="">Any status</option>' +
         EMP_STATUS.map(s => '<option value="' + s.id + '"' + (pf.st === s.id ? ' selected' : '') + '>' +
@@ -190,7 +215,7 @@ function peopleTable(rows) {
     rows.map(e =>
       '<tr onclick="location.hash=\'#/hr/p/' + e.empNo + '\'">' +
       '<td data-label="Number"><span class="ref">' + esc(e.empNo) + '</span></td>' +
-      '<td data-label="Name"><div style="display:flex;align-items:center;gap:9px">' + empAv(e, 26) +
+      '<td data-label="Name"><div style="display:flex;align-items:center;gap:9px">' + empFace(e, 26) +
         '<div><div class="sum">' + esc(fullName(e)) + '</div>' +
         '<div class="meta">' + esc(e.title) + ' · ' + esc(e.gender) + '</div></div></div></td>' +
       '<td data-label="Position">' + esc(e.position) + '</td>' +
@@ -211,13 +236,12 @@ function renderEmployee(no) {
   const boss = e.reportsTo ? emp(e.reportsTo) : null;
   const reports = state.hr.employees.filter(x => x.reportsTo === e.empNo);
   const g = grade(e.sg);
-  const left = e.leaveEntitlement - e.leaveTaken;
 
   $('#view').innerHTML =
     '<button class="back" onclick="location.hash=\'#/hr/people\'">&larr; Back to the register</button>' +
 
     '<div class="tkhead">' +
-      empAv(e, 46) +
+      empFace(e, 46) +
       '<div style="flex:1;min-width:0">' +
         '<h2>' + esc(e.title + ' ' + fullName(e)) + '</h2>' +
         '<div class="meta" style="margin-top:3px">' + esc(e.position) + ' · ' + esc(e.empNo) + '</div>' +
@@ -229,30 +253,48 @@ function renderEmployee(no) {
       card('Employment', 'not on the application form',
         '<div class="facts">' +
           kv('Employee number', esc(e.empNo)) +
-          kv('Date joined', hrDate(e.joined) + ' <span class="meta">(' + hrYears(e.joined) + ')</span>') +
-          kv('Section', sec(e.section).name) +
           kv('Position', esc(e.position)) +
+          kv('Position code', '<span class="mono">' + esc(e.positionCode || '—') + '</span>') +
+          kv('Department', sec(e.section).name + (sec(e.section).active === false ? ' <span class="meta">(closed)</span>' : '')) +
+          kv('Duty type', esc(e.dutyType || 'Full time')) +
+          /* Two dates, deliberately both shown. They are different and
+             the specification asks for both without saying which drives
+             service - so the screen says which one does. */
+          kv('Hired on', hrDate(e.hiredOn) + ' <span class="meta">offer accepted</span>') +
+          kv('Date joined', hrDate(e.joined) + ' <span class="meta">first day · ' + hrYears(e.joined) + '</span>') +
+          (e.retiredOn ? kv('Retired on', hrDate(e.retiredOn)) : '') +
           kv('Salary grade', esc(e.sg) + ' <span class="meta">' + esc(g.note) + '</span>') +
-          kv('Gross salary', money(e.salary) + ' <span class="meta">a year</span>') +
           kv('Contract', esc(contractName(e.contract))) +
+          kv('Employee status', empStatusPill(e.status)) +
           kv('Reports to', boss ? empChip(boss) : '<span class="lbl">nobody — top of the tree</span>') +
-          kv('Pension Fund number', esc(e.pensionNo)) +
-          kv('Bank', esc(e.bank) + ' <span class="meta">' + esc(e.bankAcc) + '</span>') +
-        '</div>') +
-      card('Annual leave', String(e.leaveEntitlement) + ' days entitled',
-        '<div class="leavebox">' +
-          '<div class="big2" style="font-size:34px">' + left + '</div>' +
-          '<div class="sm">days remaining this year</div>' +
-          '<div class="sla" style="margin-top:12px"><div class="bar">' +
-            '<i style="width:' + Math.round(e.leaveTaken / e.leaveEntitlement * 100) + '%;background:var(--brand)"></i>' +
-          '</div></div>' +
-          '<div class="meta" style="margin-top:7px">' + e.leaveTaken + ' taken of ' + e.leaveEntitlement + '</div>' +
-          '<div class="hint" style="margin-top:12px">21 days by statute, plus one day for every five ' +
-          'years of service. This record has ' + hrYears(e.joined) + '.</div>' +
+          kv('Work permit', e.foreigner ? 'Yes — ' + esc(e.permitCountry) : 'Not required') +
+          (e.foreigner ? kv('GOP number', '<span class="mono">' + esc(e.gopNo) + '</span>') : '') +
+        '</div>' +
+        '<div class="hint" style="margin-top:10px"><b>Service and leave are counted from the date ' +
+        'joined</b>, not the hiring date. They are usually weeks apart and the difference is a day or ' +
+        'two of entitlement — worth agreeing once rather than arguing about later.</div>') +
+      card('Photograph and identity', e.empNo, photoPanel(e)) +
+    '</div>' +
+
+    '<div class="grid c23" style="margin-bottom:14px;align-items:start">' +
+      card('Salary and bank', 'monthly', payPanel(e)) +
+      card('Bank details', esc(e.bank),
+        '<div class="facts">' +
+          kv('Bank', esc(e.bank)) +
+          kv('Branch', esc(e.bankBranch || '—')) +
+          kv('Account number', '<span class="mono">' + esc(e.bankAcc) + '</span>') +
+          kv('Pension Fund number', '<span class="mono">' + esc(e.pensionNo) + '</span>') +
+          kv('Medical benefit', e.medicalBenefit ? 'Yes' : 'No') +
+          (e.medicalBenefit ? kv('Scheme', esc(e.medicalScheme)) : '') +
         '</div>' +
         (reports.length ? '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">' +
           '<div class="lbl" style="margin-bottom:8px">Reports to this person</div>' +
           '<div class="chiprow">' + reports.map(r => empChip(r)).join('') + '</div></div>' : '')) +
+    '</div>' +
+
+    '<div class="grid c23" style="margin-bottom:14px;align-items:start">' +
+      card('Annual leave', 'computed from service', leavePanelFor(e)) +
+      card('Dependants', (e.dependants || []).length + ' recorded', dependantsPanel(e)) +
     '</div>' +
 
     '<div class="grid k2" style="margin-bottom:14px">' +
@@ -260,17 +302,28 @@ function renderEmployee(no) {
         '<div class="facts">' +
           kv('Surname', esc(e.surname)) +
           kv('First names', esc(e.firstNames) + (e.knownAs ? ' <span class="meta">(known as ' + esc(e.knownAs) + ')</span>' : '')) +
+          kv('Middle names', esc(e.middleNames)) +
           kv('Surname at birth', esc(e.surnameAtBirth)) +
           kv('Initials', esc(e.initials)) +
           kv('National Identity Number', '<span class="ref">' + esc(e.nin) + '</span>') +
+          kv('Passport number', e.passportNo ? '<span class="mono">' + esc(e.passportNo) + '</span>' : '') +
           kv('Date of birth', hrDate(e.dob) + ' <span class="meta">(' + Math.floor((Date.now() - e.dob) / (365.25 * 864e5)) + ')</span>') +
           kv('Gender', esc(e.gender)) +
           kv('Nationality', esc(e.nationality)) +
           kv('Country of birth', esc(e.countryOfBirth)) +
           kv('Marital status', esc(e.maritalStatus)) +
+          kv('District', esc(e.district)) +
+          kv('Sub-district', esc(e.subDistrict)) +
           kv('Address', esc(e.address)) +
           kv('Contact number', esc(e.phone)) +
-        '</div>') +
+          kv('Personal email', esc(e.email)) +
+          kv('Blood type', esc(e.bloodType)) +
+          kv('Religion', esc(e.religion)) +
+        '</div>' +
+        '<div class="hint" style="margin-top:10px">Blood type and religion are <b>special category</b> ' +
+        'personal data. Blood type earns its place — a driver in a road traffic accident is exactly ' +
+        'why an operator holds it. Religion needs a stated reason before it is collected, and both ' +
+        'should be visible to fewer people than the rest of this screen.</div>') +
       card('Next of kin', 'PM/05 section 10',
         '<div class="facts">' +
           kv('Surname', esc(e.nextOfKin.surname)) +
@@ -300,7 +353,19 @@ function renderEmployee(no) {
         '</div>') +
     '</div>' +
 
-    card('Employment before joining', 'PM/05 section 6', historyTable(e.history), true);
+    card('Employment before joining', 'PM/05 section 6', historyTable(e.history), true) +
+
+    '<div class="grid k2" style="margin:14px 0">' +
+      card('Disciplinary record', 'confidential', discPanelFor(e), true) +
+      card('Documents', (e.documents || []).length + ' on file', documentsPanel(e)) +
+    '</div>';
+
+  /* The file inputs have to be wired after the markup is in the page.
+     Doing it inside the string with an inline handler would work too,
+     but the photograph needs a callback and a rollback if the save is
+     refused, and that does not belong in an attribute. */
+  bindPhoto(e.empNo);
+  bindDoc(e.empNo);
 }
 
 function licName(id) { return (LICENCE_CLASSES.find(l => l.id === id) || { name: id }).name; }
@@ -553,12 +618,30 @@ function hireApplicant(a) {
     dob: a.dob, nin: a.nin, nationality: a.nationality, countryOfBirth: a.countryOfBirth,
     maritalStatus: a.maritalStatus, address: a.address, phone: a.phone,
 
+    /* fields the specification wants on an employee but PM/05 has no
+       box for. They are left EMPTY on purpose rather than invented:
+       a blank the HR officer has to fill is honest, a made-up bank
+       account number is a payment to nowhere. */
+    middleNames: '', email: '', passportNo: '', religion: '', bloodType: '',
+    district: '', subDistrict: '', photo: null, documents: [], dependants: [],
+
     section: a.section, position: a.positionTitle, isHead: false, sg: a.sg,
+    positionCode: (positionByTitle(a.positionTitle) || {}).code || null,
+    dutyType: 'Full time',
     salary: g.min,
+    hoursPerMonth: HOURS_PER_MONTH,
+    allowances: [],
+    medicalBenefit: false, medicalScheme: '',
     /* they cannot start before the date they told us they were free */
+    hiredOn: now,
     joined: Math.max(now, a.availableFrom),
+    retiredOn: null,
     contract: 'prob', status: 'probation',
-    pensionNo: '', bank: '', bankAcc: '',
+    workPermit: a.nationality !== 'Seychellois',
+    foreigner: a.nationality !== 'Seychellois',
+    permitCountry: a.nationality !== 'Seychellois' ? a.countryOfBirth : '',
+    gopNo: '',
+    pensionNo: '', bank: '', bankBranch: '', bankAcc: '',
     leaveEntitlement: 21, leaveTaken: 0,
 
     licences: a.licences.slice(),
