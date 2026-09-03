@@ -23,7 +23,7 @@
    none of it came from SPTC.
    ================================================================== */
 
-const HR_SEED_VERSION = 3;
+const HR_SEED_VERSION = 4;
 
 /* --- the form itself ---------------------------------------------
    Section numbers and titles exactly as printed on PM/05, including
@@ -911,8 +911,12 @@ function buildLeave(rng, now, employees) {
       /* clamp the block to what is left rather than abandoning the
          budget when a long block does not fit */
       const length = Math.max(2, Math.min(budget, 2 + Math.floor(rng() * 8)));
-      /* somewhere between the start of the year and a month ago */
-      const span = Math.max(1, Math.floor((now - 30 * DAY - yStart) / DAY));
+      /* Somewhere between the start of the year and a few days ahead.
+         Stopping a month short of today made every one of these leaves
+         finished, so the "off today" tile read zero across fifty-one
+         people in September - true of the data and false of any bus
+         company. A handful have to be running right now. */
+      const span = Math.max(1, Math.floor((now + 4 * DAY - yStart) / DAY));
       let from = new Date(yStart + Math.floor(rng() * span) * DAY);
       from.setHours(12, 0, 0, 0);
       let end = addDays(from, length - 1);
@@ -941,6 +945,36 @@ function buildLeave(rng, now, employees) {
       });
       budget -= w.days;
     }
+  });
+
+  /* ---- reconcile the two generators ----
+     Two passes write approved annual leave for the same people: the
+     weighted deck above, and the "already taken this year" pass below
+     it. Neither knew what the other had given, so somebody could end up
+     with thirteen approved days against an entitlement of seven - which
+     the calendar simulation found on a date ten weeks out, not today.
+
+     Rather than delete a row (which would break the guarantee that
+     every status and every type appears), walk each person's approved
+     annual leave oldest first and re-label the overflow as UNPAID.
+     That is what actually happens when somebody has used up their
+     entitlement and still needs the time, it deducts nothing, and the
+     row stays exactly where it was. */
+  const byEmp = {};
+  out.forEach(l => {
+    if (l.status !== 'approved' || !leaveType(l.type).deducts) return;
+    (byEmp[l.empNo] = byEmp[l.empNo] || []).push(l);
+  });
+  Object.keys(byEmp).forEach(empNo => {
+    const e = employees.find(x => x.empNo === empNo);
+    if (!e) return;
+    const ent = leaveEntitlement(e, year).days;
+    let used = 0;
+    byEmp[empNo].sort((a, b) => a.from - b.from).forEach(l => {
+      if (used + l.days <= ent) { used += l.days; return; }
+      l.type = 'unpaid';
+      l.reason = 'Annual entitlement already used for the year. Taken unpaid.';
+    });
   });
 
   /* overseas address only where it is actually overseas */

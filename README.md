@@ -94,6 +94,11 @@ a way a real system quietly gets somebody's leave wrong:
   one normally missed, and it is the one that causes the argument in
   January.
 
+Leave taken **beyond** the year's entitlement is recorded as *unpaid*
+rather than pushing the balance negative. That is what actually happens
+when somebody has used the year up and still needs the time, and it
+means no balance on any screen can ever be a negative number.
+
 Only a supervisor or manager can approve or decline — the Agent /
 Supervisor switch in the top bar demonstrates it. Public holidays are on
 the **Tables** screen; the movable feasts are *computed* from Easter, so
