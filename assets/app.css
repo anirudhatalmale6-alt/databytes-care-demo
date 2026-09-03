@@ -1,9 +1,18 @@
 /* ==================================================================
    SPTC Passenger Care - demo interface
-   Aesthetic: transport control room. Dense, technical, high contrast,
-   nothing decorative that does not also carry information.
-   Dark by default; a light theme is included because meeting rooms
-   and projectors are unpredictable.
+
+   Three looks, one stylesheet:
+     hcis  - the default. Matches the HCIS product the client already
+             sells, so the two read as one platform. Navy rail, near
+             white page, white cards, coloured icon chips.
+     dark  - the original control-room look. Dense and high contrast.
+     light - the same, for a projector that washes darks out.
+
+   Two colour ideas are kept apart on purpose. --brand is the
+   customer's identity and can be changed by anybody at any time.
+   --amber, --coral, --teal and the seven section colours MEAN
+   something (past target, a warning clock, Operations) and must not
+   move when somebody changes the house colour.
    ================================================================== */
 
 @font-face{font-family:Archivo;src:url(fonts/archivo-var.woff2) format('woff2');
@@ -15,6 +24,11 @@
 @font-face{font-family:'Plex Mono';src:url(fonts/ibm-plex-mono-600.woff2) format('woff2');
   font-weight:600;font-display:swap}
 
+/* --brand is the one colour the customer's own identity drives. It is kept
+   separate from --amber deliberately: amber also MEANS something here (P2,
+   a warning clock, work in progress) and must not move when somebody
+   changes the house colour. --brand-ink is the text that sits on top of it. */
+
 :root{
   --bg:#070d16; --bg-2:#0a121d;
   --panel:#0d1826; --panel-2:#122232; --panel-3:#16293b;
@@ -24,6 +38,13 @@
   --ocean:#0d8ab4; --violet:#9d8bf5;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -12px rgba(0,0,0,.7);
   --r:3px;
+  --brand:#f0a828; --brand-ink:#151007;
+  /* the rail carries its own palette so a dark sidebar can sit beside a
+     light page without every label in it inheriting the page's text colour */
+  --rail-bg:#0a121d; --rail-txt:#e8eff7; --rail-dim:#8ba0b6; --rail-faint:#5d738c;
+  --rail-line:rgba(255,255,255,.085); --rail-line-2:rgba(255,255,255,.15);
+  --rail-on:#122232; --rail-hover:#0d1826;
+  --brand-head:transparent; --brand-head-ink:var(--txt);
 }
 :root[data-theme=light]{
   --bg:#eeeae1; --bg-2:#e7e2d7;
@@ -33,6 +54,35 @@
   --amber:#b57108; --teal:#0d8f6c; --coral:#d13c33; --blue:#1d6fd0;
   --ocean:#0a6f91; --violet:#6a51d8;
   --shadow:0 1px 2px rgba(30,40,50,.08),0 10px 26px -14px rgba(30,40,50,.35);
+  --brand:#b57108; --brand-ink:#fffdf9;
+  --rail-bg:#e7e2d7; --rail-txt:#14202c; --rail-dim:#5b6c7d; --rail-faint:#8494a3;
+  --rail-line:rgba(20,30,40,.12); --rail-line-2:rgba(20,30,40,.22);
+  --rail-on:#f6f2ea; --rail-hover:#fffdf9;
+  --brand-head:transparent; --brand-head-ink:var(--txt);
+}
+
+/* ------------------------------------------------------------------
+   HCIS house style — the default.
+   The client asked for this demonstration to look like the other
+   product he sells, so the two read as one platform rather than two
+   unrelated purchases. Measured off his own HCIS build rather than
+   guessed: navy #1d2a45 rail, #f8fafb page, white cards, blue #2563eb
+   primary, soft shadows, 10px corners.
+   ------------------------------------------------------------------ */
+:root[data-theme=hcis]{
+  --bg:#f8fafb; --bg-2:#ffffff;
+  --panel:#ffffff; --panel-2:#f8fafb; --panel-3:#eef1f5;
+  --line:#e9edf2; --line-2:#dbe1e9;
+  --txt:#1f2937; --dim:#6b7280; --faint:#9aa3af;
+  --amber:#ef750c; --teal:#16a34a; --coral:#e0384a; --blue:#208ad2;
+  --ocean:#0da1ad; --violet:#8f47f0;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 6px 18px -8px rgba(16,24,40,.12);
+  --r:10px;
+  --brand:#2563eb; --brand-ink:#ffffff;
+  --rail-bg:#1d2a45; --rail-txt:#f2f6fb; --rail-dim:#a7b3c9; --rail-faint:#78859e;
+  --rail-line:rgba(255,255,255,.09); --rail-line-2:rgba(255,255,255,.16);
+  --rail-on:#313c56; --rail-hover:#26324c;
+  --brand-head:var(--brand); --brand-head-ink:var(--brand-ink);
 }
 
 *{box-sizing:border-box}
@@ -59,35 +109,69 @@ a{color:inherit}
 #app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
 
 .rail{
-  background:var(--bg-2);border-right:1px solid var(--line);
+  background:var(--rail-bg);border-right:1px solid var(--rail-line);
+  color:var(--rail-txt);
   display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
 }
-.brand{padding:20px 18px 16px;border-bottom:1px solid var(--line);position:relative}
-.brand::after{content:'';position:absolute;left:18px;right:18px;bottom:-1px;height:1px;
-  background:linear-gradient(90deg,var(--amber),transparent)}
+.brand{padding:16px 16px;border-bottom:1px solid var(--rail-line);position:relative;
+  display:flex;align-items:center;gap:11px;
+  background:var(--brand-head);color:var(--brand-head-ink)}
+.brand::after{content:'';position:absolute;left:16px;right:16px;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,var(--brand),transparent)}
+.brand .bmark{width:34px;height:34px;flex:none;border-radius:9px;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--brand) 22%,transparent);
+  border:1px solid color-mix(in srgb,var(--brand) 45%,transparent)}
+.brand .bmark svg{width:19px;height:19px;stroke:var(--brand);fill:none;stroke-width:1.7;
+  stroke-linecap:round}
+.brand .btxt{min-width:0}
 .brand b{display:block;font-size:15px;font-weight:700;letter-spacing:-.015em}
-.brand span{display:block;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
-  color:var(--faint);font-weight:600;margin-top:3px}
+.brand span{display:block;font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--rail-faint);font-weight:600;margin-top:2px}
+
+/* on the blue header band the mark and the strapline are white, not brand */
+:root[data-theme=hcis] .brand::after{background:none}
+:root[data-theme=hcis] .brand .bmark{background:color-mix(in srgb,currentColor 18%,transparent);
+  border-color:color-mix(in srgb,currentColor 32%,transparent)}
+:root[data-theme=hcis] .brand .bmark svg{stroke:currentColor}
+:root[data-theme=hcis] .brand span{color:color-mix(in srgb,currentColor 70%,transparent)}
 
 .nav{padding:12px 10px;flex:1;overflow:auto}
-.nav .lbl{padding:12px 10px 6px}
+.nav .lbl{padding:12px 10px 6px;color:var(--rail-faint)}
 .nav a{
   display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);
-  text-decoration:none;color:var(--dim);font-weight:500;font-size:13.5px;
+  text-decoration:none;color:var(--rail-dim);font-weight:500;font-size:13.5px;
   border-left:2px solid transparent;transition:.14s;
 }
-.nav a:hover{color:var(--txt);background:var(--panel)}
-.nav a.on{color:var(--txt);background:var(--panel-2);border-left-color:var(--amber)}
-.nav a .ct{margin-left:auto;font-size:11px;color:var(--faint);font-family:'Plex Mono',monospace}
-.nav a.on .ct{color:var(--amber)}
+.nav a:hover{color:var(--rail-txt);background:var(--rail-hover)}
+.nav a.on{color:var(--rail-txt);background:var(--rail-on);border-left-color:var(--brand)}
+.nav a .ct{margin-left:auto;font-size:11px;color:var(--rail-faint);font-family:'Plex Mono',monospace}
+.nav a.on .ct{color:var(--rail-txt)}
 .ico{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
 
-.railfoot{padding:12px;border-top:1px solid var(--line);font-size:11px;color:var(--faint)}
+/* HCIS marks the current page with a soft pill, not an edge rule */
+:root[data-theme=hcis] .nav a{border-left-width:0;padding-left:12px}
+:root[data-theme=hcis] .nav a.on{font-weight:600}
+
+.railfoot{padding:12px;border-top:1px solid var(--rail-line);font-size:11px;color:var(--rail-faint)}
 .railfoot button{
-  width:100%;background:transparent;border:1px solid var(--line-2);color:var(--dim);
+  width:100%;background:transparent;border:1px solid var(--rail-line-2);color:var(--rail-dim);
   padding:7px;border-radius:var(--r);cursor:pointer;font-size:11.5px;transition:.14s
 }
 .railfoot button:hover{border-color:var(--coral);color:var(--coral)}
+
+/* --- brand colour picker ---
+   Here because SPTC's own colours are not known yet. One click recolours
+   the whole interface, so the question "will it be in our colours" gets
+   answered in the meeting instead of in a follow-up email. */
+.brandpick{margin-bottom:11px}
+.brandpick .lbl{color:var(--rail-faint);margin-bottom:6px}
+.brandpick .sw{display:flex;gap:6px}
+.brandpick .sw button{
+  width:0;flex:1;height:18px;padding:0;border-radius:5px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.22);background:var(--b);transition:.14s}
+:root[data-theme=light] .brandpick .sw button{border-color:rgba(20,30,40,.2)}
+.brandpick .sw button:hover{transform:translateY(-1px)}
+.brandpick .sw button.on{box-shadow:0 0 0 2px var(--rail-bg),0 0 0 3.5px var(--b)}
 
 /* ---------------- top bar ---------------- */
 .top{
@@ -119,7 +203,7 @@ a{color:inherit}
 
 .iconbtn{background:transparent;border:1px solid var(--line-2);color:var(--dim);width:30px;height:30px;
   border-radius:var(--r);display:grid;place-items:center;cursor:pointer;transition:.14s}
-.iconbtn:hover{color:var(--amber);border-color:var(--amber)}
+.iconbtn:hover{color:var(--brand);border-color:var(--brand)}
 
 /* ---------------- content ---------------- */
 main{padding:24px 22px 60px;max-width:1500px}
@@ -197,7 +281,7 @@ main{padding:24px 22px 60px;max-width:1500px}
 .tbl tbody tr{cursor:pointer;transition:background .12s;scroll-margin-top:112px}
 .tbl tbody tr:hover{background:var(--panel-2)}
 .tbl tbody tr td:first-child{box-shadow:inset 2px 0 0 transparent;transition:box-shadow .12s}
-.tbl tbody tr:hover td:first-child{box-shadow:inset 2px 0 0 var(--amber)}
+.tbl tbody tr:hover td:first-child{box-shadow:inset 2px 0 0 var(--brand)}
 .tbl .ref{font-family:'Plex Mono',monospace;font-size:11.5px;color:var(--dim)}
 .tbl .sum{font-weight:600;font-size:13px}
 .tbl .meta{font-size:11.5px;color:var(--faint);margin-top:1px}
@@ -209,13 +293,13 @@ main{padding:24px 22px 60px;max-width:1500px}
 .filters select,.filters input{
   background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r);
   padding:7px 9px;font-size:12.5px;min-width:120px;outline:0;transition:.14s}
-.filters select:focus,.filters input:focus{border-color:var(--amber)}
+.filters select:focus,.filters input:focus{border-color:var(--brand)}
 .filters input[type=search]{min-width:220px}
 .chipbtn{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r);
   padding:7px 11px;font-size:12px;color:var(--dim);cursor:pointer;transition:.14s}
 .chipbtn:hover{color:var(--txt);border-color:var(--line-2)}
-.chipbtn.on{background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--amber);
-  border-color:color-mix(in srgb,var(--amber) 45%,transparent)}
+.chipbtn.on{background:color-mix(in srgb,var(--brand) 15%,transparent);color:var(--brand);
+  border-color:color-mix(in srgb,var(--brand) 45%,transparent)}
 
 /* ---------------- charts ---------------- */
 .bars{display:flex;flex-direction:column;gap:9px}
@@ -252,7 +336,7 @@ main{padding:24px 22px 60px;max-width:1500px}
 /* ---------------- ticket detail ---------------- */
 .back{background:transparent;border:0;color:var(--dim);cursor:pointer;font-size:12.5px;
   display:inline-flex;align-items:center;gap:6px;padding:0;margin-bottom:14px}
-.back:hover{color:var(--amber)}
+.back:hover{color:var(--brand)}
 
 .tkhead{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:6px}
 .tkhead h2{margin:0;font-size:21px;font-weight:700;letter-spacing:-.025em}
@@ -279,15 +363,15 @@ main{padding:24px 22px 60px;max-width:1500px}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
 .btn{background:var(--panel-2);border:1px solid var(--line-2);color:var(--txt);padding:8px 13px;
   border-radius:var(--r);cursor:pointer;font-size:12.5px;font-weight:500;transition:.14s}
-.btn:hover{border-color:var(--amber);color:var(--amber)}
-.btn.primary{background:var(--amber);border-color:var(--amber);color:#151007;font-weight:600}
-.btn.primary:hover{filter:brightness(1.08);color:#151007}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08);color:var(--brand-ink)}
 .btn.good{border-color:color-mix(in srgb,var(--teal) 50%,transparent);color:var(--teal)}
 .btn.good:hover{background:color-mix(in srgb,var(--teal) 12%,transparent)}
 
 textarea,.frm input,.frm select{width:100%;background:var(--panel-2);border:1px solid var(--line-2);
   border-radius:var(--r);padding:9px 11px;font-size:13px;outline:0;transition:.14s;resize:vertical}
-textarea:focus,.frm input:focus,.frm select:focus{border-color:var(--amber);background:var(--panel)}
+textarea:focus,.frm input:focus,.frm select:focus{border-color:var(--brand);background:var(--panel)}
 .frm{display:grid;gap:13px}
 .frm .two{display:grid;grid-template-columns:1fr 1fr;gap:13px}
 .frm label{display:block}
@@ -476,4 +560,120 @@ textarea:focus,.frm input:focus,.frm select:focus{border-color:var(--amber);back
   .rb-mid{flex-wrap:wrap}
   /* the rules table carries five columns of prose; stacked, as the queue is */
   .rules .rule-h{gap:7px}
+}
+
+/* ==================================================================
+   HCIS house style — the pieces that are shape rather than colour.
+   The client sells HCIS to the same market and asked that this read
+   as the same product family. Everything below was measured off his
+   own build (screenshots/01-dashboard.png) rather than eyeballed.
+   ================================================================== */
+
+/* the grain exists to stop large dark panels looking flat; on a white
+   page it only makes the white look dirty */
+:root[data-theme=hcis] body::after{display:none}
+
+/* a white top bar over a near-white page needs a real edge, not a blur */
+:root[data-theme=hcis] .top{
+  height:64px;background:var(--panel);backdrop-filter:none;border-bottom:1px solid var(--line)}
+:root[data-theme=hcis] .top h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
+:root[data-theme=hcis] .top .sub{font-size:12.5px}
+:root[data-theme=hcis] .tbl th{top:64px}
+:root[data-theme=hcis] .tbl tbody tr{scroll-margin-top:124px}
+
+/* HCIS cards: no visible outline, a soft lift, generous corners */
+:root[data-theme=hcis] .card{border-color:var(--line)}
+:root[data-theme=hcis] .card>header{padding:15px 18px}
+:root[data-theme=hcis] .card>header h3{font-size:14.5px;font-weight:700;letter-spacing:-.01em}
+:root[data-theme=hcis] .card .body{padding:18px}
+:root[data-theme=hcis] .tbl th{background:var(--panel-2);color:var(--dim);
+  letter-spacing:.08em;font-size:10.5px}
+:root[data-theme=hcis] .tbl td{padding:13px 16px}
+
+/* segmented control as a soft track with a solid brand pill */
+:root[data-theme=hcis] .seg{background:var(--panel-3);border:0;padding:3px;border-radius:9px;gap:2px}
+:root[data-theme=hcis] .seg button{border-radius:6px;padding:5px 12px;font-weight:600}
+:root[data-theme=hcis] .seg button.on{background:var(--brand);color:var(--brand-ink)}
+
+/* status and priority chips are fully rounded in HCIS */
+:root[data-theme=hcis] .pill,
+:root[data-theme=hcis] .pri,
+:root[data-theme=hcis] .secpill,
+:root[data-theme=hcis] .route,
+:root[data-theme=hcis] .rulechip{border-radius:999px;padding-left:9px;padding-right:9px}
+:root[data-theme=hcis] .iconbtn{width:36px;height:36px;border-radius:9px}
+:root[data-theme=hcis] .av{width:34px;height:34px;font-size:11.5px;
+  background:var(--brand);color:var(--brand-ink);border:0}
+
+/* ---- stat tiles: coloured icon chip, then the number, then the caption ---- */
+.kpi-top{display:flex;align-items:flex-start;justify-content:space-between;
+  gap:10px;margin-bottom:12px}
+.kchip{width:38px;height:38px;flex:none;border-radius:10px;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--k) 15%,transparent);
+  border:1px solid color-mix(in srgb,var(--k) 32%,transparent)}
+.kchip svg{width:19px;height:19px;stroke:var(--k);fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.klabel{font-size:13px;font-weight:600;margin-top:2px}
+.kpi .trend{position:static}          /* it now sits in the top row */
+
+/* HCIS fills the chip solid and drops the accent rule down the edge */
+:root[data-theme=hcis] .kpi{padding:17px 18px 16px}
+:root[data-theme=hcis] .kpi::before{display:none}
+:root[data-theme=hcis] .kchip{background:var(--k);border:0}
+:root[data-theme=hcis] .kchip svg{stroke:#fff;stroke-width:2}
+:root[data-theme=hcis] .kpi .n{font-family:inherit;font-size:29px;font-weight:700;
+  letter-spacing:-.03em;margin:2px 0 4px}
+:root[data-theme=hcis] .kpi .trend{font-family:inherit;font-weight:600;font-size:12px;
+  padding:2px 8px;border-radius:999px;
+  background:color-mix(in srgb,currentColor 12%,transparent)}
+
+/* ---- the notification bell in the top bar ---- */
+.bell{position:relative;text-decoration:none}
+.bell .bdg{
+  position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;
+  border-radius:999px;background:var(--coral);color:#fff;font-size:10px;font-weight:700;
+  display:grid;place-items:center;line-height:1;border:2px solid var(--bg);
+  font-family:Archivo,sans-serif}
+:root[data-theme=hcis] .bell .bdg{border-color:var(--panel)}
+.bell .bdg.zero{display:none}
+.bell.here{color:var(--brand);border-color:var(--brand)}
+
+@media(max-width:900px){
+  /* the rail turns into a horizontal strip on a phone; the brand block and
+     the colour picker are the two things that do not belong in a strip */
+  .brand{display:none}
+  .brandpick{display:none}
+  /* the bell is the redundant control here - Notifications is already in
+     the nav strip carrying the same count - and dropping it is what keeps
+     the avatar inside the viewport instead of 29px past it */
+  .bell{display:none}
+  :root[data-theme=hcis] .top{height:56px}
+  :root[data-theme=hcis] .tbl th{top:56px}
+  :root[data-theme=hcis] .top h1{font-size:15px}
+  :root[data-theme=hcis] .av{width:28px;height:28px;font-size:10.5px}
+  :root[data-theme=hcis] .iconbtn{width:30px;height:30px;border-radius:8px}
+}
+
+/* The teal-to-amber bar gradient belongs to the control-room look; against
+   the HCIS palette it reads as a second, competing accent. One colour, the
+   customer's own, and the length of the bar carries the information. */
+:root[data-theme=hcis] .bars .tr i{background:var(--brand)}
+:root[data-theme=hcis] .bars .tr,
+:root[data-theme=hcis] .wl .tr,
+:root[data-theme=hcis] .sla .bar{background:var(--panel-3)}
+:root[data-theme=hcis] .wl .tr i{background:var(--brand)}
+:root[data-theme=hcis] .quote{border-left-color:var(--brand);border-radius:var(--r)}
+:root[data-theme=hcis] .routebox{border-left-width:3px}
+:root[data-theme=hcis] .banner{border-radius:var(--r)}
+:root[data-theme=hcis] .kpi .trend.down{color:var(--teal)}
+
+/* The routing table's second column must never wrap: a section name that
+   folds under its own pill turns every row of that section into two lines
+   and makes the table look like a mistake. The column sizes to whatever the
+   longest name is instead of to a number somebody guessed. */
+.tbl.nowrap2 td:nth-child(2),
+.tbl.nowrap2 th:nth-child(2){white-space:nowrap}
+@media(max-width:720px){
+  /* stacked into cards on a phone, where nowrap would push the card wide */
+  .tbl.nowrap2 td:nth-child(2){white-space:normal}
 }

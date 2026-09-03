@@ -17,8 +17,11 @@ const HOUR = 3600 * 1000;
 
 /* Bumped whenever the seed data changes shape. Anybody who opened an
    earlier build has the old data sitting in their browser storage and
-   would otherwise never see the corrections. */
-const SEED_VERSION = 5;
+   would otherwise never see the corrections.
+   6 = the stored session also carries the look and the brand colour. Without
+   this bump every earlier visitor keeps theme:'dark' and reports, quite
+   reasonably, that the restyle never arrived. */
+const SEED_VERSION = 6;
 
 /* --- how quickly each kind of report has to be answered ---------- */
 const PRIORITIES = {
@@ -319,21 +322,54 @@ function buildSeed() {
   const tickets = [];
   let n = 0;
 
-  /* 21 days of history, busier on weekdays and in the morning peak  */
+  /* --- pass one: when the cases arrived ---------------------------
+     How many cases exist depends on which weekdays fall in the last
+     21 days, so it changes from one day to the next. The times are
+     worked out first, on their own, so that the subjects can then be
+     dealt across however many there turn out to be.                 */
+  const slots = [];
   for (let day = 20; day >= 0; day--) {
     const dow = new Date(now - day * 24 * HOUR).getDay();
     const base = (dow === 0) ? 1 : (dow === 6) ? 2 : 3;
     const count = base + Math.floor(rng() * 3);
 
     for (let k = 0; k < count; k++) {
-      const catId = pick(bag);
-      const cat = CATEGORIES.find(c => c.id === catId);
-      const route = pick(ROUTES);
-      const [pname, pphone] = pick(PASSENGERS);
       const hourOfDay = pick([6, 7, 7, 8, 8, 9, 11, 13, 15, 16, 17, 17, 18, 19]);
       const created = now - day * 24 * HOUR - (rng() * 6) * HOUR
                       + (hourOfDay - 12) * HOUR;
       if (created > now) continue;
+      slots.push(created);
+    }
+  }
+
+  /* --- pass two: what each case is about --------------------------
+     A weighted draw alone let a section end up holding two cases on
+     some dates, because three of the seven sections are reachable
+     from a single subject. A board with a 2 on it reads as broken
+     software rather than a quiet week, and which day it happens on
+     is pure luck - so every section is dealt a floor first and the
+     rest of the deck is filled from the weighted bag.               */
+  const FLOOR = 4;
+  const deck = [];
+  SECTIONS.forEach(s => {
+    const own = CATEGORIES.filter(c => c.section === s.id).map(c => c.id);
+    for (let i = 0; i < FLOOR; i++) deck.push(own[i % own.length]);
+  });
+  while (deck.length < slots.length) deck.push(bag[Math.floor(rng() * bag.length)]);
+  /* shuffled with the same seeded stream, so the guaranteed cases are
+     spread over the three weeks instead of parked in the oldest days */
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = deck[i]; deck[i] = deck[j]; deck[j] = t;
+  }
+
+  {
+    for (let si = 0; si < slots.length; si++) {
+      const created = slots[si];
+      const catId = deck[si];
+      const cat = CATEGORIES.find(c => c.id === catId);
+      const route = pick(ROUTES);
+      const [pname, pphone] = pick(PASSENGERS);
 
       const ageH = (now - created) / HOUR;
       const pri = PRIORITIES[cat.pri];

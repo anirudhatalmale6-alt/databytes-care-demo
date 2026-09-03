@@ -20,7 +20,8 @@ function load() {
     }
   } catch (e) { /* fall through to a fresh seed */ }
   const tickets = buildSeed();
-  return { v: SEED_VERSION, tickets, alerts: buildAlerts(tickets), me: 'u6', theme: 'dark', seq: 0 };
+  return { v: SEED_VERSION, tickets, alerts: buildAlerts(tickets), me: 'u6',
+           theme: 'hcis', brand: null, seq: 0 };
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
 function reset() {
@@ -219,10 +220,10 @@ function renderDashboard() {
   $('#view').innerHTML =
     banner() +
     '<div class="grid k4" style="margin-bottom:14px">' +
-      kpi('Open cases', open.length, 'currently being handled', '--amber', null) +
-      kpi('Past target', overdue.length, 'need attention now', '--coral', null) +
-      kpi('Replied on time', respPct + '%', 'first response, all cases', respPct >= 85 ? '--teal' : '--amber', null) +
-      kpi('New this week', last7.length, 'vs ' + prev7.length + ' the week before', '--blue', dv) +
+      kpi('Open cases', open.length, 'currently being handled', '--amber', null, 'inbox') +
+      kpi('Past target', overdue.length, 'need attention now', '--coral', null, 'clock') +
+      kpi('Replied on time', respPct + '%', 'first response, all cases', respPct >= 85 ? '--teal' : '--amber', null, 'check') +
+      kpi('New this week', last7.length, 'vs ' + prev7.length + ' the week before', '--blue', dv, 'trend') +
     '</div>' +
 
     '<div class="grid c23" style="margin-bottom:14px">' +
@@ -262,11 +263,26 @@ function banner() {
          'log a case, assign it, work it through and watch the clocks move.</div></div>';
 }
 function setHead(h, s) { $('#ph').textContent = h; $('#ps').textContent = s; }
-function kpi(label, n, d, colorVar, dl) {
+/* Stat-tile icons. A tile carries a coloured chip in HCIS, and the chip is
+   the only thing on the tile that says at a glance which of the four it is
+   before you have read a single word. */
+const KPI_ICONS = {
+  inbox: '<path d="M5.5 5.5h13l2.5 7.5v5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 18v-5z"/>' +
+         '<path d="M3 13h5l1.5 3h5L16 13h5"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.2 2"/>',
+  check: '<circle cx="12" cy="12" r="8.5"/><path d="M8.4 12.2l2.5 2.5 4.7-5"/>',
+  trend: '<path d="M3.5 16.5l5.5-5.5 3.5 3.5 7-7"/><path d="M14 7.5h5.5V13"/>'
+};
+function kpi(label, n, d, colorVar, dl, icon) {
   return '<div class="card kpi" style="--k:var(' + colorVar + ')">' +
-    '<div class="lbl">' + esc(label) + '</div>' +
-    (dl ? '<div class="trend ' + dl.c + '">' + dl.s + '</div>' : '') +
-    '<div class="n">' + esc(n) + '</div><div class="d">' + esc(d) + '</div></div>';
+    '<div class="kpi-top">' +
+      '<span class="kchip"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+        (KPI_ICONS[icon] || KPI_ICONS.inbox) + '</svg></span>' +
+      (dl ? '<span class="trend ' + dl.c + '">' + dl.s + '</span>' : '') +
+    '</div>' +
+    '<div class="n">' + esc(n) + '</div>' +
+    '<div class="klabel">' + esc(label) + '</div>' +
+    '<div class="d">' + esc(d) + '</div></div>';
 }
 function card(title, right, body, flush) {
   return '<div class="card"><header><h3>' + esc(title) + '</h3>' +
@@ -1003,9 +1019,12 @@ function renderRules() {
       'screen is so SPTC can cross bits out. Every line lives in one file and takes minutes to change.</div></div>' +
 
     card('Where a complaint goes', 'the subject decides',
-      /* the section names run long - "Operations and Scheduling" wrapped
-         under its own pill at 230px and made every Ops row two lines */
-      '<table class="tbl"><thead><tr><th>Subject chosen at intake</th><th style="width:272px">Goes straight to</th>' +
+      /* The section names run long. A fixed width was set here once to stop
+         "Operations and Scheduling" wrapping under its own pill, and it
+         expired the moment the cell padding changed - the same rows went
+         back to two lines. The column now refuses to wrap and sizes itself,
+         which cannot come undone when SPTC's own names turn out longer. */
+      '<table class="tbl nowrap2"><thead><tr><th>Subject chosen at intake</th><th>Goes straight to</th>' +
       '<th style="width:186px">Landing with</th><th style="width:52px">Pri</th><th style="width:114px">Reply / settle</th>' +
       '</tr></thead><tbody>' + routeRows + '</tbody></table>', true) +
 
@@ -1057,6 +1076,45 @@ function toast(msg, bad) {
   document.body.appendChild(el);
   setTimeout(() => { el.style.transition = '.3s'; el.style.opacity = 0; setTimeout(() => el.remove(), 320); }, 2600);
 }
+const THEME_NAMES = { hcis: 'as HCIS', dark: 'control room, dark', light: 'control room, light' };
+function applyTheme(name) {
+  state.theme = name;
+  document.documentElement.setAttribute('data-theme', name);
+}
+
+/* One value recolours the whole interface. SPTC's own colours are not known
+   yet, so this is a setting rather than something baked into the stylesheet;
+   when the logo arrives its hex becomes the default and this stays as the
+   thing that proves, in the room, that the system takes their colours. */
+function applyBrand(hex) {
+  const root = document.documentElement;
+  state.brand = hex || null;
+  if (!hex) { root.style.removeProperty('--brand'); root.style.removeProperty('--brand-ink'); }
+  else {
+    root.style.setProperty('--brand', hex);
+    /* Which ink a brand colour needs is not a guess and not a threshold:
+       work out the contrast both ways round and take the better one. A
+       threshold picked white for amber, where it scores 2.0 against 10.4
+       for dark - a button label nobody could read. */
+    const L = luminance(hex);
+    root.style.setProperty('--brand-ink',
+      contrast(L, 1) >= contrast(L, luminance('#151007')) ? '#ffffff' : '#151007');
+  }
+  document.querySelectorAll('#swatches button').forEach(b =>
+    b.classList.toggle('on', !!hex && b.dataset.brand.toLowerCase() === hex.toLowerCase()));
+}
+function luminance(hex) {
+  const h = hex.replace('#', '');
+  const v = i => {
+    const c = parseInt(h.substr(i, 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * v(0) + 0.7152 * v(2) + 0.0722 * v(4);
+}
+function contrast(a, b) {
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
 function paintChrome() {
   const u = me();
   $('#whoName').textContent = u.name;
@@ -1070,6 +1128,15 @@ function paintChrome() {
   const un = unreadAlerts();
   const badge = $('#ctAlerts');
   if (badge) { badge.textContent = un; badge.classList.toggle('hot', un > 0); }
+  const bell = $('#bellCt');
+  if (bell) {
+    bell.textContent = un > 99 ? '99+' : un;
+    /* a bell reading 0 is worse than no bell - it is a control that looks
+       broken. Hide the badge rather than show a zero. */
+    bell.classList.toggle('zero', un === 0);
+  }
+  const bb = $('#bellBtn');
+  if (bb) bb.classList.toggle('here', (location.hash || '').indexOf('/alerts') !== -1);
 }
 function tick() {
   $('#clock').textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1081,7 +1148,11 @@ function boot() {
      leave every rule with nowhere to write. Rebuild rather than
      throw away the tickets somebody may have logged. */
   if (!Array.isArray(state.alerts)) state.alerts = buildAlerts(state.tickets);
-  document.documentElement.setAttribute('data-theme', state.theme || 'dark');
+  /* 'hcis' is the default look: the client asked for this to match the other
+     product he sells. Anyone carrying a stored 'dark' or 'light' from an
+     earlier build keeps it - it is a preference, not a defect. */
+  applyTheme(state.theme || 'hcis');
+  applyBrand(state.brand);
 
   document.querySelectorAll('#roleSeg button').forEach(b => b.onclick = () => {
     state.me = b.dataset.role === 'agent' ? 'u1' : 'u6';
@@ -1089,11 +1160,17 @@ function boot() {
     save(); paintChrome(); router();
   });
   $('#themeBtn').onclick = () => {
-    state.theme = (state.theme === 'dark') ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', state.theme);
-    save(); router();
+    const order = ['hcis', 'dark', 'light'];
+    const i = order.indexOf(state.theme || 'hcis');
+    applyTheme(order[(i + 1) % order.length]);
+    save(); router(); toast('Look: ' + THEME_NAMES[state.theme]);
   };
   $('#resetBtn').onclick = reset;
+
+  document.querySelectorAll('#swatches button').forEach(b => {
+    b.style.setProperty('--b', b.dataset.brand);
+    b.onclick = () => { applyBrand(b.dataset.brand); save(); };
+  });
 
   window.addEventListener('hashchange', () => { paintChrome(); router(); });
   paintChrome(); router();

@@ -60,6 +60,36 @@ somebody, and being answered inside an agreed time.
 - **Management view** — volumes over 21 days, subject mix, busiest routes,
   agent workload, and safety reports called out separately.
 
+## Look and feel
+
+It opens in the **HCIS house style**, so that this and HCIS read as two
+modules of one platform rather than two unrelated purchases: navy rail with
+a coloured brand header, near-white page, white cards, soft corners,
+coloured icon chips on the figures. Those values were measured off the HCIS
+build itself rather than matched by eye.
+
+The theme button in the top bar cycles three looks — **as HCIS**, and the
+original **control room** in dark and light. The control-room looks are
+denser and were built for a projector; they are kept because a meeting room
+is unpredictable.
+
+**Brand colour.** SPTC's own colours are not in this yet. Rather than guess
+them, the brand colour is a single value driving the rail header, the active
+menu item, primary buttons, avatars, focus rings and the chart bars, with a
+picker at the bottom of the rail. One click recolours the interface, which
+answers "will it be in our colours" in the room instead of in a follow-up
+email. When the logo arrives its hex becomes the default and the picker can
+go.
+
+The text colour that sits on the brand is not a guess either: it is chosen by
+comparing the contrast of white and near-black against the chosen colour and
+taking the better one. A fixed rule put white on amber, which scores 2.0
+against 10.4 and leaves a button nobody can read.
+
+Colours that carry **meaning** — red for past target, amber for a warning
+clock, the seven section colours — are deliberately *not* tied to the brand,
+so changing the house colour cannot quietly change what a colour tells you.
+
 ### The service-level model
 
 | Priority | Subjects | Reply within | Settle within |
@@ -88,7 +118,9 @@ room wifi does not.
 | **The sections themselves, and who heads them** | `SECTIONS`, `assets/data.js` |
 | **Who is notified, and when** | `NOTIFY_RULES`, `assets/data.js` |
 | Screens and behaviour | `assets/app.js` |
-| Appearance, light and dark themes | `assets/app.css` |
+| Appearance, all three looks | `assets/app.css` |
+| **The brand colour, once SPTC's is known** | `--brand` in `:root[data-theme=hcis]`, `assets/app.css` |
+| The five colours in the picker | `data-brand` on the buttons in `index.html` |
 
 The three rows in bold are the workflow. They are deliberately written as
 data rather than buried in code, and the **Routing rules** screen renders
