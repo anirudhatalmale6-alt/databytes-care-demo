@@ -13,9 +13,16 @@
    - The daily rate is basic pay divided by the number of days in THAT
      month, so it is worked out, never stored. A day in February is
      worth more than a day in August.
-   - ONE LINE PER PERSON, always. Finance pay once per NIN, so a second
-     line for the same person is dropped without a word. An adjustment
-     therefore changes the line it belongs to; it never adds another.
+   - ONE LINE PER PERSON, always. Finance pay once per member number, so
+     a second line for the same person is dropped without a word. An
+     adjustment therefore changes the line it belongs to; it never adds
+     another.
+   - TWO numbers, not one. The national identity number says who someone
+     is (nine digits, first six the date of birth - the rule the
+     employment form already enforces). The pension fund member number
+     says where the money goes (eleven digits). The payroll file calls
+     the second one NIN, which is very likely why "wrong documentation"
+     keeps coming up.
    - The CEO's approval is a request for a SUM. It is a ceiling. Going
      under it needs nobody. Going over it is a new request.
    - Amending is allowed for as long as the money has not gone. Not for
@@ -23,7 +30,7 @@
      banks have been paid, and a clock can only ever guess at that.
    ------------------------------------------------------------------ */
 
-const PAY_SEED_VERSION = 1;
+const PAY_SEED_VERSION = 2;
 const PAY_SPF_RATE = 0.05;
 
 /* The states a run moves through, in order. Amending is allowed while
@@ -128,7 +135,7 @@ function payDiff(run) {
   const before = {};
   prev.lines.forEach(l => { before[l.nin] = l; });
   const seen = {};
-  const added = [], moved = [];
+  const added = [], moved = [], payTo = [];
   run.lines.forEach(l => {
     seen[l.nin] = 1;
     const was = before[l.nin];
@@ -136,9 +143,14 @@ function payDiff(run) {
     if (was.basic !== l.basic || was.type !== l.type) {
       moved.push({ line: l, was: was.basic, now: l.basic });
     }
+    /* Keyed on the identity number, so this compares the same PERSON
+       across two months. Keyed on the member number it would compare the
+       same bank instruction, and a person whose payment address moved
+       would look like one person leaving and another arriving. */
+    if (was.spfNo !== l.spfNo) payTo.push({ line: l, was: was.spfNo, now: l.spfNo });
   });
   const gone = prev.lines.filter(l => !seen[l.nin]);
-  return { added, gone, moved, prev };
+  return { added, gone, moved, payTo, prev };
 }
 
 /* ---------------- the checks ----------------
@@ -151,35 +163,67 @@ function payDiff(run) {
    identity number can be caught. */
 function payChecks(run) {
   const out = [];
-  const byNin = {};
-  run.lines.forEach(l => (byNin[l.nin] = byNin[l.nin] || []).push(l));
 
-  Object.keys(byNin).forEach(nin => {
-    const g = byNin[nin];
+  /* Two numbers, two different jobs, two different failures.
+
+     The national identity number says WHO this is. Nine digits, first six
+     the date of birth - the same number and the same rule the employment
+     form already enforces, because there should only ever be one of it in
+     HCIS.
+
+     The pension fund member number is WHERE THE MONEY GOES. Eleven digits.
+     It is the one the payroll file calls NIN, and calling it that is
+     probably the reason "wrong documentation" comes up as often as it
+     does - two different numbers with one name between them.
+
+     So a repeat of the member number is a PAYMENT problem, and a repeat of
+     the identity number is an IDENTITY problem, and they are not the same
+     problem at all. */
+
+  const bySpf = {};
+  run.lines.forEach(l => (bySpf[l.spfNo] = bySpf[l.spfNo] || []).push(l));
+  Object.keys(bySpf).forEach(no => {
+    const g = bySpf[no];
     if (g.length < 2) return;
     const amounts = new Set(g.map(l => payLine(run, l).net.toFixed(2)));
     out.push(amounts.size > 1 ? {
-      bad: true, t: 'Same identity number, different amounts',
-      d: nin + ' appears ' + g.length + ' times with different net pay. Finance pay ' +
-         'once per identity number, so one of these will be paid and the rest will be ' +
-         'dropped without a word. Leave one line.'
+      bad: true, t: 'Same pension member number, different amounts',
+      d: no + ' appears ' + g.length + ' times with different net pay. Finance pay once ' +
+         'per member number, so one of these figures will be paid and the rest dropped ' +
+         'without a word. Leave one line.'
     } : {
-      bad: true, t: 'Same identity number twice',
-      d: nin + ' appears ' + g.length + ' times. Nobody will be paid twice, but the ' +
-         'repeats declare pension that this person did not earn.'
+      bad: true, t: 'Same pension member number twice',
+      d: no + ' appears ' + g.length + ' times. Nobody will be paid twice, but the repeats ' +
+         'declare pension this person did not earn.'
     });
   });
 
-  const shape = s => String(s).replace(/\d/g, '9');
-  const shapes = {};
-  run.lines.forEach(l => { shapes[shape(l.nin)] = (shapes[shape(l.nin)] || 0) + 1; });
-  const usual = Object.keys(shapes).sort((a, b) => shapes[b] - shapes[a])[0];
-  run.lines.filter(l => shape(l.nin) !== usual).forEach(l => out.push({
-    bad: true, t: 'Identity number written differently',
-    d: esc(l.name) + ' has ' + esc(l.nin) + ', which is not the shape the other ' +
-       shapes[usual] + ' use (' + usual + '). A wrong number does not fail - it pays ' +
-       'the wrong person, or nobody.'
-  }));
+  const byNin = {};
+  run.lines.forEach(l => (byNin[l.nin] = byNin[l.nin] || []).push(l));
+  Object.keys(byNin).forEach(nin => {
+    if (byNin[nin].length < 2) return;
+    out.push({
+      bad: true, t: 'One person, two lines',
+      d: 'Identity number ' + nin + ' is on this run ' + byNin[nin].length + ' times' +
+         (new Set(byNin[nin].map(l => l.spfNo)).size > 1
+           ? ', under different pension member numbers - so the payment check above cannot ' +
+             'see it, and they would be paid twice.'
+           : '.')
+    });
+  });
+
+  const shape = s2 => String(s2).replace(/\d/g, '9');
+  [['spfNo', 'pension member number'], ['nin', 'identity number']].forEach(([k, label]) => {
+    const shapes = {};
+    run.lines.forEach(l => { shapes[shape(l[k])] = (shapes[shape(l[k])] || 0) + 1; });
+    const usual = Object.keys(shapes).sort((a, b) => shapes[b] - shapes[a])[0];
+    run.lines.filter(l => shape(l[k]) !== usual).forEach(l => out.push({
+      bad: true, t: 'A ' + label + ' written differently',
+      d: esc(l.name) + ' has ' + esc(l[k]) + ', which is not the shape the other ' +
+         shapes[usual] + ' use (' + usual + '). A wrong number does not fail - it pays the ' +
+         'wrong person, or nobody.'
+    }));
+  });
 
   const byName = {};
   run.lines.forEach(l => (byName[l.name.toUpperCase()] = byName[l.name.toUpperCase()] || new Set())
@@ -187,19 +231,35 @@ function payChecks(run) {
   Object.keys(byName).forEach(n => {
     if (byName[n].size > 1) out.push({
       bad: true, t: 'One name, two identity numbers',
-      d: esc(n) + ' appears under ' + byName[n].size + ' different numbers. If that is one ' +
-         'person they are on this run twice, and the check above cannot see it because the ' +
-         'numbers genuinely differ.'
+      d: esc(n) + ' appears under ' + byName[n].size + ' different identity numbers. If ' +
+         'that is one person they are on this run twice, and the checks above cannot see ' +
+         'it because the numbers genuinely differ.'
     });
   });
 
   const d = payDiff(run);
-  if (d && d.added.length) out.push({
-    bad: false, t: d.added.length + ' on a run for the first time',
-    d: d.added.map(l => esc(l.name)).join(', ') + '. Finance keep no list of their own - ' +
-       'they pay whoever is in the file - so nothing downstream will question these. ' +
-       'HC are the only check there is.'
-  });
+  if (d) {
+    /* The one that only became possible once both numbers existed.
+
+       Somebody's pension member number changing between two months means
+       the money is going somewhere it did not go last month. That is
+       occasionally legitimate and it is never routine, so it should never
+       pass unread. With one number in the file there was nothing to
+       compare it against. */
+    d.payTo.forEach(m => out.push({
+      bad: true, t: 'The money is going somewhere new',
+      d: esc(m.line.name) + ' had member number ' + esc(m.was) + ' last month and ' +
+         esc(m.now) + ' on this run. Same person, different payment address. That can be ' +
+         'right, but it should never go through without somebody reading it.'
+    }));
+
+    if (d.added.length) out.push({
+      bad: false, t: d.added.length + ' on a run for the first time',
+      d: d.added.map(l => esc(l.name)).join(', ') + '. Finance keep no list of their own - ' +
+         'they pay whoever is in the file - so nothing downstream will question these. ' +
+         'HC are the only check there is.'
+    });
+  }
 
   return out;
 }
@@ -211,10 +271,22 @@ function payRng(seed) {
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 }
 
-function payMakeNin(rng) {
+/* The pension fund's own member number - the eleven-digit thing the
+   payroll file calls NIN. It is a payment address, not an identity. */
+function payMakeSpfNo(rng) {
   const d = n => String(Math.floor(rng() * Math.pow(10, n))).padStart(n, '0');
   return d(3) + '-' + d(4) + '-' + String(Math.floor(rng() * 3)) + '-' +
          String(Math.floor(rng() * 2)) + '-' + d(2);
+}
+
+/* The real one. Nine digits, and the first six are the date of birth -
+   the same rule the employment form already enforces, because it is the
+   same number and there should only ever be one of it in HCIS. */
+function payMakeNin(rng) {
+  const dd = 1 + Math.floor(rng() * 28), mm = 1 + Math.floor(rng() * 12);
+  const yy = 62 + Math.floor(rng() * 38);
+  const p2 = n => String(n).padStart(2, '0');
+  return p2(dd) + p2(mm) + p2(yy) + String(Math.floor(rng() * 900) + 100);
 }
 
 function payBuildSeed() {
@@ -241,6 +313,7 @@ function payBuildSeed() {
     const full = rng() < 0.82;
     people.push({
       nin: payMakeNin(rng),
+      spfNo: payMakeSpfNo(rng),
       name: surnames[i] + '  ' + firsts[(i * 7) % firsts.length],
       type: full ? 'Full Day' : 'Half Day',
       basic: full ? FULL : HALF,
@@ -250,7 +323,7 @@ function payBuildSeed() {
   }
 
   const mkLines = (list, year, month) => list.map(p => ({
-    nin: p.nin, name: p.name, type: p.type, basic: p.basic,
+    nin: p.nin, spfNo: p.spfNo, name: p.name, type: p.type, basic: p.basic,
     allowances: p.allowances, otherDed: p.otherDed,
     days: payDaysInMonth(year, month),
     adjustments: []
@@ -287,6 +360,7 @@ function payBuildSeed() {
     requested: 0
   };
   cur.lines.push(JSON.parse(JSON.stringify(cur.lines[4])));   /* the duplicate */
+  cur.lines[9].spfNo = payMakeSpfNo(rng);   /* somebody's payment address moved */
   cur.lines[6].basic = 7633.47;                                /* a rate that moved */
   cur.lines[6].type = 'Full Day';
   cur.requested = Math.ceil(payTotals(cur).net / 1000) * 1000;
@@ -430,7 +504,9 @@ function payDiffBox(run) {
     bit('New this month', d.added.map(l => esc(l.name))) +
     bit('Gone since last month', d.gone.map(l => esc(l.name))) +
     bit('Amount moved', d.moved.map(m =>
-      esc(m.line.name) + ' &mdash; ' + payMoney(m.was) + ' to ' + payMoney(m.now)));
+      esc(m.line.name) + ' &mdash; ' + payMoney(m.was) + ' to ' + payMoney(m.now))) +
+    bit('Paid to a different number', d.payTo.map(m =>
+      esc(m.line.name) + ' &mdash; ' + esc(m.was) + ' to ' + esc(m.now)));
   if (!body) return card('What changed since ' + payMonthName(d.prev.year, d.prev.month),
     'nothing', '<div class="hint">The same people at the same rates.</div>');
   return card('What changed since ' + payMonthName(d.prev.year, d.prev.month),
@@ -487,8 +563,9 @@ function payLinesBox(run, fin) {
     const c = payLine(run, l);
     const cutDays = l.days - c.days;
     return '<tr>' +
-      '<td data-label="Person"><b>' + esc(l.name) + '</b><div class="meta mono">' +
-        esc(l.nin) + '</div></td>' +
+      '<td data-label="Person"><b>' + esc(l.name) + '</b>' +
+        '<div class="meta mono">' + esc(l.nin) + ' &middot; pays to ' + esc(l.spfNo) +
+        '</div></td>' +
       '<td data-label="Type">' + esc(l.type) + '</td>' +
       '<td data-label="Days">' + c.days + ' of ' + l.days +
         (cutDays ? ' <span class="lbl">-' + cutDays + '</span>' : '') + '</td>' +
