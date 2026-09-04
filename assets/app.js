@@ -225,10 +225,19 @@ function router() {
   /* Two modules share one shell. Which one is showing is derived from the
      address, not held in a variable, so a pasted link always lands in the
      right module with the right menu beside it. */
-  const mod = view === 'hr' ? 'hr' : 'care';
+  const mod = view === 'hr' ? 'hr' : (view === 'pay' ? 'pay' : 'care');
   document.documentElement.setAttribute('data-mod', mod);
   document.querySelectorAll('#modsw a').forEach(a =>
     a.classList.toggle('on', a.dataset.mod === mod));
+
+  if (mod === 'pay') {
+    const sub = '#/' + ['pay'].concat(parts[1] ? [parts[1]] : []).join('/');
+    document.querySelectorAll('.navset[data-mod=pay] a').forEach(a =>
+      a.classList.toggle('on', a.getAttribute('href') === sub));
+    payRoute(parts.slice(1));
+    window.scrollTo(0, 0);
+    return;
+  }
 
   if (mod === 'hr') {
     const sub = '#/' + ['hr'].concat(parts[1] ? [parts[1]] : []).join('/');
@@ -1259,6 +1268,16 @@ function boot() {
   if (!state.hr || !Array.isArray(state.hr.employees) || state.hrV !== HR_SEED_VERSION) {
     state.hr = buildHrSeed();
     state.hrV = HR_SEED_VERSION;
+  }
+  /* Payment runs carry their own version for the same reason the HR
+     branch does: the three sets of sample data change at different
+     times, and one shared sentinel is how a half-applied upgrade
+     happens. `as` is the shoes you are standing in, and it lives on
+     state.pay rather than being rebuilt with the runs. */
+  if (!state.pay || !Array.isArray(state.pay.runs) || state.pay.v !== PAY_SEED_VERSION) {
+    const keepAs = state.pay && state.pay.as;
+    state.pay = payBuildSeed();
+    if (keepAs) state.pay.as = keepAs;
   }
   /* The HR module grew a leave register, a disciplinary register,
      announcements and the two reference tables after the first build.
