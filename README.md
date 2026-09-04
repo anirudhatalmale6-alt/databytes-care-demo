@@ -42,6 +42,39 @@ Two things to say plainly about that form:
   paste when the form was drawn up in Word in 2017. It is shown once here,
   with a note.
 
+### One page, or step by step
+
+The form offers both, chosen by a switch at the top of it. **One page is
+the default**, because that is the version already approved and because it
+is the one that matches the paper: somebody transcribing a completed sheet
+wants to go straight down it without pressing Next four times.
+
+The stepped version groups the thirteen sections into five:
+
+| Step | Sections |
+| --- | --- |
+| 1 — Post and personal | 1, 2 |
+| 2 — Education and skills | 3, 4, 5 |
+| 3 — Experience | 6, 7, 8 |
+| 4 — References and kin | 9, 10 |
+| 5 — Declaration | 11, 12, 13 |
+
+**This is not a second form.** `renderApplyForm()` builds every field
+exactly as it always did; `applyStepper()` in `assets/hr2.js` then groups
+the sections it produced and hides all but one group. There is one set of
+inputs, one *Fill it in for me*, one submit and one set of validation
+rules, so the two views cannot drift apart. A stepped form that carried its
+own copy of the fields would mean fixing every bug twice.
+
+Two consequences worth knowing:
+
+- Validation reaches across steps. Submitting from step 5 with an empty
+  surname does not complain about a field you cannot see — it moves to
+  step 1, shows the field and focuses it.
+- The choice is stored on `state.applyMode`, deliberately **not** inside
+  `state.hr`, because bumping `HR_SEED_VERSION` rebuilds `state.hr` from
+  the seed and would throw the choice away.
+
 ### What it does
 
 - **Register** of the establishment, filterable by section, grade and

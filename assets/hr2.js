@@ -1190,3 +1190,140 @@ function bindDoc(empNo) {
     renderEmployee(empNo);
   };
 }
+
+/* ================= FORM PM/05: one page, or step by step =================
+   Evans sent Doc1.docx: two screenshots, no text. One is the HCIS intake
+   wizard (Personal Info / Household / Socio-Economic / Documents), the other
+   is this module's employee list with the "New PM/05 application" button in
+   the corner. The obvious reading is "put PM/05 on steps like that one".
+
+   Obvious is not the same as confirmed, and he has already approved the
+   one-page form, so I have not replaced it. Both live at the same address
+   and a switch at the top of the form chooses between them.
+
+   The important part: this does NOT build a second form. renderApplyForm()
+   builds every field exactly as before; the code below only groups the
+   sections it already produced and hides all but one group. There is one
+   set of inputs, one fill routine and one submit routine, so the two views
+   cannot drift apart — a stepped form with its own copy of the fields is
+   how you end up fixing every bug twice. */
+
+const APPLY_STEPS = [
+  { name: 'Post and personal',    secs: [1, 2] },
+  { name: 'Education and skills', secs: [3, 4, 5] },
+  { name: 'Experience',           secs: [6, 7, 8] },
+  { name: 'References and kin',   secs: [9, 10] },
+  { name: 'Declaration',          secs: [11, 12, 13] }
+];
+
+let applyStepAt = 0;
+
+/* Stored on state, not state.hr, so that bumping HR_SEED_VERSION — which
+   rebuilds state.hr from the seed — does not silently throw his choice away. */
+function applyMode() { return state.applyMode === 'steps' ? 'steps' : 'page'; }
+
+function setApplyMode(m) {
+  if (applyMode() === m) return;
+  state.applyMode = m;
+  save();
+  applyStepAt = 0;
+  renderApplyForm();
+}
+
+function stepOfSection(n) {
+  for (let i = 0; i < APPLY_STEPS.length; i++) {
+    if (APPLY_STEPS[i].secs.indexOf(n) >= 0) return i;
+  }
+  return APPLY_STEPS.length - 1;   /* a new section belongs somewhere, not nowhere */
+}
+
+/* Called by submitApplication when a required field is empty. In one-page
+   mode scrollIntoView is enough; in stepped mode the field may be on a step
+   that is not on screen, and focusing a hidden input does nothing at all —
+   the user would get a complaint about a field they cannot see. */
+function stepShowFor(el) {
+  if (applyMode() !== 'steps' || !el) return;
+  let n = el;
+  while (n && !(n.classList && n.classList.contains('fsec'))) n = n.parentNode;
+  if (!n) return;
+  const at = +n.getAttribute('data-step');
+  if (!isNaN(at)) goApplyStep(at, true);
+}
+
+function goApplyStep(at, quiet) {
+  const secs = Array.prototype.slice.call(document.querySelectorAll('#view .card.fsec'));
+  if (!secs.length) return;
+  const last = APPLY_STEPS.length - 1;
+  applyStepAt = Math.max(0, Math.min(last, at));
+
+  secs.forEach(s => {
+    s.style.display = (+s.getAttribute('data-step') === applyStepAt) ? '' : 'none';
+  });
+
+  document.querySelectorAll('#view .stepitem').forEach((b, i) => {
+    b.classList.toggle('on', i === applyStepAt);
+    b.classList.toggle('done', i < applyStepAt);
+  });
+
+  const back = $('#stepBack'), next = $('#stepNext'), of = $('#stepOf');
+  if (back) back.disabled = applyStepAt === 0;
+  if (next) next.style.display = applyStepAt === last ? 'none' : '';
+  if (of) of.textContent = 'Step ' + (applyStepAt + 1) + ' of ' + (last + 1) +
+    ' — ' + APPLY_STEPS[applyStepAt].name;
+
+  if (!quiet) {
+    const bar = document.querySelector('#view .stepbar');
+    if (bar) bar.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+}
+
+/* Runs at the end of renderApplyForm, after the sections exist. */
+function applyStepper() {
+  const view = $('#view');
+  const secs = Array.prototype.slice.call(view.querySelectorAll('.card.fsec'));
+  if (!secs.length) return;
+  const stepped = applyMode() === 'steps';
+
+  const sw = document.createElement('div');
+  sw.className = 'modesw';
+  sw.innerHTML = '<span>Fill it in</span><div class="seg2">' +
+    '<button data-m="page"' + (stepped ? '' : ' class="on"') + '>On one page</button>' +
+    '<button data-m="steps"' + (stepped ? ' class="on"' : '') + '>Step by step</button>' +
+    '</div><span class="hint">The same form and the same fields either way.</span>';
+  const note = view.querySelector('.formnote');
+  if (note && note.nextSibling) view.insertBefore(sw, note.nextSibling);
+  else view.insertBefore(sw, secs[0]);
+  sw.querySelectorAll('button').forEach(b => {
+    b.onclick = () => setApplyMode(b.getAttribute('data-m'));
+  });
+
+  if (!stepped) return;
+
+  secs.forEach(s => {
+    const num = +(s.querySelector('.fnum') || {}).textContent;
+    s.setAttribute('data-step', stepOfSection(num));
+  });
+
+  const bar = document.createElement('div');
+  bar.className = 'stepbar';
+  bar.innerHTML = APPLY_STEPS.map((s, i) =>
+    '<button class="stepitem" type="button">' +
+    '<span class="stepdot">' + (i + 1) + '</span>' +
+    '<span class="steptxt"><b>Step ' + (i + 1) + '</b><span>' + esc(s.name) + '</span></span>' +
+    '</button>').join('<span class="steprule"></span>');
+  view.insertBefore(bar, secs[0]);
+  bar.querySelectorAll('.stepitem').forEach((b, i) => { b.onclick = () => goApplyStep(i); });
+
+  const nav = document.createElement('div');
+  nav.className = 'stepnav';
+  nav.innerHTML = '<button class="btn" id="stepBack">&larr; Back</button>' +
+    '<span class="mono" id="stepOf"></span>' +
+    '<button class="btn primary" id="stepNext">Next &rarr;</button>';
+  const lastSec = secs[secs.length - 1];
+  if (lastSec.nextSibling) view.insertBefore(nav, lastSec.nextSibling);
+  else view.appendChild(nav);
+  $('#stepBack').onclick = () => goApplyStep(applyStepAt - 1);
+  $('#stepNext').onclick = () => goApplyStep(applyStepAt + 1);
+
+  goApplyStep(applyStepAt, true);
+}

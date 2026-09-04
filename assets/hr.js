@@ -812,6 +812,7 @@ function renderApplyForm() {
   syncCode();
   $('#f_fill').onclick = fillApplyForm;
   $('#f_save').onclick = submitApplication;
+  applyStepper();   /* groups the sections above into steps, if that mode is on */
 }
 
 function fillApplyForm() {
@@ -857,12 +858,18 @@ function submitApplication() {
   for (let i = 0; i < need.length; i++) {
     if (!val(need[i][0])) {
       toast('The form needs ' + need[i][1] + '.', true);
-      const el = $('#' + need[i][0]); el.focus(); el.scrollIntoView({ block: 'center' });
+      const el = $('#' + need[i][0]);
+      /* In stepped mode the empty field may be two steps back. Focusing an
+         input inside a display:none block does nothing, so the complaint
+         would name a field the user cannot see. Go to its step first. */
+      stepShowFor(el);
+      el.focus(); el.scrollIntoView({ block: 'center' });
       return;
     }
   }
   if (!$('#f_declare').checked) {
     toast('The declaration in section 13 has to be signed.', true);
+    stepShowFor($('#f_declare'));
     $('#f_declare').scrollIntoView({ block: 'center' });
     return;
   }
@@ -870,7 +877,11 @@ function submitApplication() {
      digits. Checking that here is the cheapest possible catch for a
      mistyped one, and it is a rule the registry already applies. */
   const nin = val('f_nin').replace(/\D/g, '');
-  if (nin.length !== 9) { toast('A National Identity Number is nine digits.', true); return; }
+  if (nin.length !== 9) {
+    toast('A National Identity Number is nine digits.', true);
+    stepShowFor($('#f_nin')); $('#f_nin').focus();
+    return;
+  }
   const dob = new Date(val('f_dob'));
   const p = n => String(n).padStart(2, '0');
   const expect = p(dob.getDate()) + p(dob.getMonth() + 1) + p(dob.getFullYear() % 100);
