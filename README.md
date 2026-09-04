@@ -44,10 +44,19 @@ Two things to say plainly about that form:
 
 ### One page, or step by step
 
-The form offers both, chosen by a switch at the top of it. **One page is
-the default**, because that is the version already approved and because it
-is the one that matches the paper: somebody transcribing a completed sheet
-wants to go straight down it without pressing Next four times.
+The form offers both, chosen by a switch at the top of it. **Step by step
+is the default** — it was built as the alternative and offered alongside
+the approved one-page version, and the customer compared the two and chose
+it on 4 September 2026.
+
+One page is still there on the switch, and is worth keeping: somebody
+transcribing a completed paper sheet wants to go straight down it without
+pressing Next four times.
+
+Because the customer had already clicked the switch while comparing, a
+stored choice existed that would have masked the new default. `APPLY_MODE_V`
+in `assets/hr2.js` retires choices stored before the default changed, so
+the change lands once; anything chosen afterwards sticks.
 
 The stepped version groups the thirteen sections into five:
 

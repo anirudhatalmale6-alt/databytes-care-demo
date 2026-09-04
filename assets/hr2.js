@@ -1218,14 +1218,29 @@ const APPLY_STEPS = [
 
 let applyStepAt = 0;
 
-/* Stored on state, not state.hr, so that bumping HR_SEED_VERSION — which
-   rebuilds state.hr from the seed — does not silently throw his choice away. */
-function applyMode() { return state.applyMode === 'steps' ? 'steps' : 'page'; }
+/* Evans compared the two on 4 Sep and chose step by step, so that is the
+   default now. One catch: he had already clicked the switch while looking,
+   so his browser holds a stored choice — and a stored choice would mask
+   the new default and leave him on whichever he happened to press last.
+   APPLY_MODE_V retires stored choices made before the default changed, so
+   it takes effect once, and anything he clicks after this still sticks.
+
+   Stored on state, not state.hr: bumping HR_SEED_VERSION rebuilds
+   state.hr from the seed and would throw the choice away. */
+const APPLY_MODE_V = 2;
+
+function applyMode() {
+  if (state.applyModeV !== APPLY_MODE_V) return 'steps';
+  return state.applyMode === 'page' ? 'page' : 'steps';
+}
 
 function setApplyMode(m) {
-  if (applyMode() === m) return;
+  m = (m === 'page') ? 'page' : 'steps';
+  const changed = applyMode() !== m;
   state.applyMode = m;
-  save();
+  state.applyModeV = APPLY_MODE_V;   /* set even when unchanged, or his */
+  save();                            /* choice never becomes his own    */
+  if (!changed) return;
   applyStepAt = 0;
   renderApplyForm();
 }
