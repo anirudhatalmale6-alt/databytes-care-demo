@@ -69,6 +69,7 @@ function hrRoute(parts) {
   else if (v === 'apps')   renderApplications();
   else if (v === 'a')      renderApplication(parts[1]);
   else if (v === 'apply')  renderApplyForm();
+  else if (v === 'new')    renderNewEmployee();
   else if (v === 'leave')  { parts[1] === 'new' ? renderLeaveForm(parts[2]) : renderLeave(); }
   else if (v === 'l')      renderLeaveRecord(parts[1]);
   else if (v === 'disc')   { parts[1] === 'new' ? renderDiscForm() : renderDiscipline(); }
@@ -179,7 +180,9 @@ function renderPeople() {
         GRADES.map(g => '<option value="' + g.sg + '"' + (pf.sg === g.sg ? ' selected' : '') + '>' +
           esc(g.sg + ' — ' + g.note) + '</option>').join('') + '</select>' +
       '<span class="spacer"></span>' +
-      '<a class="btn primary" href="#/hr/apply">New PM/05 application</a>' +
+      /* the employee register adds employees. PM/05 is recruitment and
+         lives on the Applications screen, where it belongs. */
+      '<a class="btn primary" href="#/hr/new">New employee</a>' +
     '</div>' +
     '<div class="card" id="pwrap"></div>';
 

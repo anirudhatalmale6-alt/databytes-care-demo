@@ -66,7 +66,7 @@ const SPTC_TICKETS_URL = 'https://sptc.databytes.sc/';
 const LOGIN_PASSWORD = 'sptc2026';
 
 const LOGIN_ACCOUNTS = [
-  { user: 'alex.etienne@sptc.sc',    staff: 's1', to: '#/dashboard', note: 'the whole corporation, both modules' },
+  { user: 'alex.etienne@sptc.sc',    staff: 's1', to: '#/dashboard', note: 'full access \u2014 both modules and the setup tables' },
   { user: 'stephie.soomery@sptc.sc', staff: 's2', to: '#/dashboard', note: 'the system itself, and who may use it' },
   { user: 'brenda.julie@sptc.sc',    staff: 's3', to: '#/hr',        note: 'the establishment, leave and discipline' },
   { user: 'evans@databytes.sc',      staff: 's4', to: '#/dashboard', note: 'everything, including the setup tables' },
@@ -139,10 +139,10 @@ function loginRender(onDone) {
 
   wrap.innerHTML =
     '<div class="si-art">' +
-      '<img id="si_bg" src="assets/login-bg.jpg?v=18" alt="">' +
+      '<img id="si_bg" src="assets/login-bg.jpg?v=19" alt="">' +
       '<div class="si-wash"></div>' +
       '<div class="si-art-in">' +
-        '<span class="si-crest"><img src="assets/sptc-logo.png?v=18" alt="SPTC" width="150" height="150"></span>' +
+        '<span class="si-crest"><img src="assets/sptc-logo.png?v=19" alt="SPTC" width="150" height="150"></span>' +
         '<h1>Seychelles Public Transport Corporation</h1>' +
         '<span class="si-rule"></span>' +
         '<p class="si-sub">Passenger Care and Human Resources</p>' +
@@ -163,7 +163,7 @@ function loginRender(onDone) {
     '<div class="si-form">' +
       '<div class="si-card">' +
         '<div class="si-mob">' +
-          '<span class="si-crest sm"><img src="assets/sptc-logo.png?v=18" alt="SPTC" width="150" height="150"></span>' +
+          '<span class="si-crest sm"><img src="assets/sptc-logo.png?v=19" alt="SPTC" width="150" height="150"></span>' +
           '<b>SPTC</b><span>Public Transport</span>' +
         '</div>' +
 

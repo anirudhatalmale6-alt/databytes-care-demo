@@ -1160,3 +1160,21 @@ button.danger:hover{background:color-mix(in srgb,var(--coral) 10%,transparent);
 }
 .si-support a{color:#2563eb; text-decoration:none; font-weight:600}
 .si-support a:hover{text-decoration:underline}
+
+
+/* --- New Employee form --- */
+
+/* A file input that is honest about what it does: the file is never read
+   and never leaves the browser, only its name is kept. */
+.fileinp{
+  width:100%; padding:8px 10px; border:1px dashed var(--line-2); border-radius:var(--r);
+  background:var(--panel-2); color:var(--dim); font:inherit; font-size:12px; cursor:pointer;
+}
+.fileinp::file-selector-button{
+  border:0; border-radius:6px; padding:5px 10px; margin-right:9px; cursor:pointer;
+  background:var(--brand); color:var(--brand-ink); font:inherit; font-size:11.5px; font-weight:600;
+}
+
+.formactions{
+  display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin:14px 0 30px;
+}

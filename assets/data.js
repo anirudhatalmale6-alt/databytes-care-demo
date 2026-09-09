@@ -156,6 +156,10 @@ const STAFF = [
      The 51 people in the Human Resources establishment are a separate
      invented set and stay that way. These four USE the system; those
      51 are sample records inside it.                                */
+  /* General Manager, reports to the CEO. `exec` is the top role here and
+     it clears every check in the application - approvals, both modules,
+     the setup tables. Confirmed by grep rather than assumed: the only
+     role test in the HR module admits supervisor, head and exec. */
   { id: 's1', name: 'Alex Etienne',   title: 'GM Corporate',   role: 'exec',       initials: 'AE', available: true, sec: 'care', real: true },
   { id: 's2', name: 'Stephie Soomery', title: 'IT Supervisor', role: 'supervisor', initials: 'SS', available: true, sec: 'care', real: true },
   { id: 's3', name: 'Brenda Julie',   title: 'HR Director',    role: 'head',       initials: 'BJ', available: true, sec: 'crew', real: true },
