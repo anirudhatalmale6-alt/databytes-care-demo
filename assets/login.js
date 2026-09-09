@@ -29,26 +29,42 @@
 
 const LOGIN_KEY = 'sptc_demo_session';
 
-/* The demonstration accounts.
+/* The four accounts, named by the client on 9 September 2026.
 
-   Invented people, like everybody else in this demonstration. The
-   spread is chosen to show the one thing worth showing - that the same
-   system looks different depending on whose job you are doing - so
-   there is an agent who sees their own work, a supervisor who sees the
-   section's, an HR officer and the chief executive.
+   THESE ARE REAL PEOPLE AND REAL WORK ADDRESSES, which changes what
+   this list is allowed to do. Everything else in this demonstration is
+   invented; these are not, and the page they sit on is public.
 
-   `to` is where each lands, so signing in as HR does not open the
-   passenger care desk and leave somebody hunting for the module
-   switch. */
+   So the list shows the name, the job and the address CUT SHORT -
+   `alex.etienne@...`. Signing in still uses the whole address, and
+   clicking a row fills the whole address into the box where the person
+   can see it. Nothing is lost in the room: each of these four already
+   knows their own address, and the one on screen is enough for them to
+   recognise it.
+
+   What it avoids is a public web page carrying the name, the job title
+   and the full working address of SPTC's GM, IT Supervisor and HR
+   Director, three lines apart, ready to be copied. That list is worth
+   more to somebody writing a convincing email than it is to us.
+
+   Say the word and it is one line here to print them in full.
+
+   `to` is where each lands, so the HR Director does not open the
+   passenger care desk and have to go hunting for the module switch. */
 const LOGIN_PASSWORD = 'sptc2026';
 
 const LOGIN_ACCOUNTS = [
-  { user: 'a.servina',  staff: 'u1',  to: '#/dashboard', note: 'sees the cases assigned to them' },
-  { user: 't.bristol',  staff: 'u6',  to: '#/dashboard', note: 'sees the whole section, and the workload' },
-  { user: 's.dugasse',  staff: 'u12', to: '#/hr',        note: 'the establishment, leave and discipline' },
-  { user: 'f.larue',    staff: 'u13', to: '#/hr',        note: 'day to day HR, same screens, fewer powers' },
-  { user: 'm.payet',    staff: 'u11', to: '#/dashboard', note: 'the view from the top of the corporation' },
+  { user: 'alex.etienne@sptc.sc',    staff: 's1', to: '#/dashboard', note: 'the whole corporation, both modules' },
+  { user: 'stephie.soomery@sptc.sc', staff: 's2', to: '#/dashboard', note: 'the system itself, and who may use it' },
+  { user: 'brenda.julie@sptc.sc',    staff: 's3', to: '#/hr',        note: 'the establishment, leave and discipline' },
+  { user: 'evans@databytes.sc',      staff: 's4', to: '#/dashboard', note: 'everything, including the setup tables' },
 ];
+
+/* alex.etienne@sptc.sc -> alex.etienne@... */
+function loginMask(addr) {
+  const at = String(addr).indexOf('@');
+  return at === -1 ? String(addr) : String(addr).slice(0, at) + '@\u2026';
+}
 
 function loginStaff(id) {
   return (typeof STAFF !== 'undefined' && STAFF.find(s => s.id === id)) || null;
@@ -105,16 +121,16 @@ function loginRender(onDone) {
         '<span class="si-tt">' + loginEsc(s.title) + '</span>' +
         '<span class="si-nt">' + loginEsc(a.note) + '</span>' +
       '</span>' +
-      '<span class="si-un mono">' + loginEsc(a.user) + '</span>' +
+      '<span class="si-un mono">' + loginEsc(loginMask(a.user)) + '</span>' +
     '</button>';
   }).join('');
 
   wrap.innerHTML =
     '<div class="si-art">' +
-      '<img id="si_bg" src="assets/login-bg.jpg?v=16" alt="">' +
+      '<img id="si_bg" src="assets/login-bg.jpg?v=17" alt="">' +
       '<div class="si-wash"></div>' +
       '<div class="si-art-in">' +
-        '<span class="si-crest"><img src="assets/sptc-logo.png?v=16" alt="SPTC" width="150" height="150"></span>' +
+        '<span class="si-crest"><img src="assets/sptc-logo.png?v=17" alt="SPTC" width="150" height="150"></span>' +
         '<h1>Seychelles Public Transport Corporation</h1>' +
         '<span class="si-rule"></span>' +
         '<p class="si-sub">Passenger Care and Human Resources</p>' +
@@ -131,7 +147,7 @@ function loginRender(onDone) {
     '<div class="si-form">' +
       '<div class="si-card">' +
         '<div class="si-mob">' +
-          '<span class="si-crest sm"><img src="assets/sptc-logo.png?v=16" alt="SPTC" width="150" height="150"></span>' +
+          '<span class="si-crest sm"><img src="assets/sptc-logo.png?v=17" alt="SPTC" width="150" height="150"></span>' +
           '<b>SPTC</b><span>Public Transport</span>' +
         '</div>' +
 
@@ -141,8 +157,8 @@ function loginRender(onDone) {
         '<div class="si-err" id="si_err" hidden></div>' +
 
         '<form id="si_form" autocomplete="off">' +
-          '<label><span>Username</span>' +
-            '<input id="si_user" type="text" placeholder="a.servina" autocomplete="username" autocapitalize="none" spellcheck="false"></label>' +
+          '<label><span>Email address</span>' +
+            '<input id="si_user" type="text" placeholder="name@sptc.sc" autocomplete="username" autocapitalize="none" spellcheck="false"></label>' +
           '<label><span>Password</span>' +
             '<span class="si-pw">' +
               '<input id="si_pass" type="password" placeholder="Enter your password" autocomplete="current-password">' +
@@ -160,8 +176,9 @@ function loginRender(onDone) {
             '<p class="si-hint">Pick anybody to sign straight in. The password for every ' +
               'one of them is <span class="mono">' + loginEsc(LOGIN_PASSWORD) + '</span>.</p>' +
             rows +
-            '<p class="si-warn">These people are invented, and so is the password. This ' +
-              'screen checks it in the browser and nothing stands behind it &mdash; it shows ' +
+            '<p class="si-warn">These four are real people; the password is not, and neither ' +
+              'is anything inside. This screen checks the password in the browser and nothing ' +
+              'stands behind it &mdash; it shows ' +
               'what signing in looks like, it does not protect anything.</p>' +
           '</div>' +
         '</div>' +
@@ -214,7 +231,11 @@ function loginRender(onDone) {
       if (!acct) return;
       wrap.querySelector('#si_user').value = acct.user;
       wrap.querySelector('#si_pass').value = LOGIN_PASSWORD;
-      enter(acct);
+      /* Held long enough to be read. The list only shows the address cut
+         short, so this is the moment the whole one is on screen - and in
+         a demonstration, watching the box fill in is half the point of
+         clicking the row rather than typing. */
+      setTimeout(() => enter(acct), 450);
     };
   });
 

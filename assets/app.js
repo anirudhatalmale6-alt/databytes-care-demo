@@ -76,7 +76,15 @@ const cat = id => CATEGORIES.find(c => c.id === id) || { name: id, pri: 'P3' };
 const chan = id => (CHANNELS.find(c => c.id === id) || { name: id }).name;
 const staff = id => STAFF.find(s => s.id === id) || null;
 const route = no => ROUTES.find(r => r.no === no) || { no, name: '' };
-const me = () => staff(state.me);
+const me = () => staff(state.me) || STAFF[0];
+
+/* Whoever came through the sign-in screen, as opposed to whoever is
+   being looked at right now. The two differ while somebody is standing
+   in an agent's shoes. */
+function signedInStaff() {
+  const s = typeof loginSession === 'function' && loginSession();
+  return s && s.staff ? staff(s.staff) : null;
+}
 const isOpen = t => OPEN_STATUSES.includes(t.status);
 /* One department list, two modules. Passenger Care routes a complaint
    to a department; HR employs people into the same department. The
@@ -1210,8 +1218,15 @@ function paintChrome() {
   $('#whoName').textContent = u.name;
   $('#whoTitle').textContent = u.title;
   $('#whoAv').textContent = u.initials;
-  document.querySelectorAll('#roleSeg button').forEach(b =>
-    b.classList.toggle('on', b.dataset.role === (u.role === 'agent' ? 'agent' : 'sup')));
+  /* The left button carries the signed-in person's own first name, so
+     stepping out of their shoes and back is obvious rather than a guess
+     at what "Supervisor" meant. */
+  const home = signedInStaff();
+  const asMe = !home || state.me === home.id;
+  document.querySelectorAll('#roleSeg button').forEach(b => {
+    if (b.dataset.role === 'me' && home) b.textContent = home.name.split(' ')[0];
+    b.classList.toggle('on', (b.dataset.role === 'me') === asMe);
+  });
   const open = state.tickets.filter(isOpen);
   $('#ctQueue').textContent = open.length;
   $('#ctNew').textContent = state.tickets.filter(t => t.status === 'New').length;
@@ -1336,7 +1351,10 @@ function boot() {
   if (so) so.onclick = loginSignOut;
 
   document.querySelectorAll('#roleSeg button').forEach(b => b.onclick = () => {
-    state.me = b.dataset.role === 'agent' ? 'u1' : 'u6';
+    /* Back to yourself, or into an agent's shoes. Never to some third
+       person nobody chose - which is what 'sup' -> u6 used to do. */
+    const home = signedInStaff();
+    state.me = b.dataset.role === 'agent' ? 'u1' : (home ? home.id : 'u6');
     qf.mine = false; qf.touched = 0;
     save(); paintChrome(); router();
   });

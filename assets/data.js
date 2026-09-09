@@ -137,7 +137,29 @@ const STAFF = [
   { id: 'u14', name: 'Marie Confait',   title: 'Fleet Maintenance Manager',  role: 'head',       initials: 'MC', available: true,  sec: 'fleet' },
   { id: 'u15', name: 'Georges Marie',   title: 'Finance Manager',            role: 'head',       initials: 'GM', available: true,  sec: 'fin'   },
   { id: 'u16', name: 'Elsie Nourrice',  title: 'Workshop Scheduler',         role: 'member',     initials: 'EN', available: true,  sec: 'fleet' },
-  { id: 'u17', name: 'Dora Esparon',    title: 'Training Coordinator',       role: 'member',     initials: 'DE', available: true,  sec: 'crew'  }
+  { id: 'u17', name: 'Dora Esparon',    title: 'Training Coordinator',       role: 'member',     initials: 'DE', available: true,  sec: 'crew'  },
+
+  /* ---------------------------------------------------------------
+     THE FOUR REAL PEOPLE. Everybody above is invented; these four are
+     not. They are the accounts that sign in, named by the client on
+     9 September 2026.
+
+     They are kept apart by `real: true` for one reason: nothing in the
+     demonstration may put a real person's name against invented data.
+     They are none of them role 'agent', so they never enter AGENTS or
+     ASSIGNABLE, never appear in the workload chart, and are never
+     offered as somebody to hand a complaint to. What they do get is
+     their own name in the corner and their own name against anything
+     they actually do while signed in - which is the point of having
+     them.
+
+     The 51 people in the Human Resources establishment are a separate
+     invented set and stay that way. These four USE the system; those
+     51 are sample records inside it.                                */
+  { id: 's1', name: 'Alex Etienne',   title: 'GM Corporate',   role: 'exec',       initials: 'AE', available: true, sec: 'care', real: true },
+  { id: 's2', name: 'Stephy Soomery', title: 'IT Supervisor',  role: 'supervisor', initials: 'SS', available: true, sec: 'care', real: true },
+  { id: 's3', name: 'Brenda Julie',   title: 'HR Director',    role: 'head',       initials: 'BJ', available: true, sec: 'crew', real: true },
+  { id: 's4', name: 'Evans Delcy',    title: 'Super Admin',    role: 'exec',       initials: 'ED', available: true, sec: 'care', real: true }
 ];
 const AGENTS = STAFF.filter(s => s.role === 'agent');
 /* who can actually be given a new case right now */

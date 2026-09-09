@@ -6,7 +6,7 @@
 <title>SPTC — working demonstration</title>
 <meta name="robots" content="noindex,nofollow">
 <meta name="description" content="Passenger care and human resources — working demonstration prepared by DataBytes Consulting.">
-<link rel="stylesheet" href="assets/app.css?v=16">
+<link rel="stylesheet" href="assets/app.css?v=17">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%232d3283'/%3E%3Crect x='7' y='9' width='18' height='12' rx='2.5' fill='%23fcdb2e'/%3E%3Ccircle cx='11.5' cy='22' r='2' fill='%23ffffff'/%3E%3Ccircle cx='20.5' cy='22' r='2' fill='%23ffffff'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -35,7 +35,7 @@
   <aside class="rail">
     <div class="brand">
       <span class="bmark">
-        <img src="assets/sptc-logo.png?v=16" alt="SPTC" width="150" height="150">
+        <img src="assets/sptc-logo.png?v=17" alt="SPTC" width="150" height="150">
       </span>
       <div class="btxt">
         <b>SPTC</b>
@@ -172,9 +172,18 @@
 
       <div class="live"><span class="dot"></span><span class="mono" id="clock">--:--:--</span></div>
 
+      <!-- The same system seen by two different jobs. The left button is
+           whoever signed in and is labelled with their name; the right one
+           steps into a care agent's shoes so the difference can be shown.
+
+           It used to say Agent / Supervisor and quietly reassign state.me
+           to an invented member of staff. That was harmless while the
+           accounts were invented too. It is not harmless now that four
+           real people sign in by name: pressing Agent replaced the name in
+           the corner with somebody else's and read as a fault. -->
       <div class="seg" id="roleSeg" title="The same system, seen by two different jobs">
-        <button data-role="agent">Agent</button>
-        <button data-role="sup">Supervisor</button>
+        <button data-role="me">Me</button>
+        <button data-role="agent">An agent</button>
       </div>
 
       <a class="iconbtn bell" id="bellBtn" href="#/alerts" title="Notifications">
@@ -202,11 +211,11 @@
 
 </div>
 
-<script src="assets/data.js?v=16"></script>
-<script src="assets/login.js?v=16"></script>
-<script src="assets/hr-data.js?v=16"></script>
-<script src="assets/app.js?v=16"></script>
-<script src="assets/hr.js?v=16"></script>
-<script src="assets/hr2.js?v=16"></script>
+<script src="assets/data.js?v=17"></script>
+<script src="assets/login.js?v=17"></script>
+<script src="assets/hr-data.js?v=17"></script>
+<script src="assets/app.js?v=17"></script>
+<script src="assets/hr.js?v=17"></script>
+<script src="assets/hr2.js?v=17"></script>
 </body>
 </html>
