@@ -189,7 +189,10 @@ function renderPeople() {
       if (pf.st && e.status !== pf.st) return false;
       if (pf.sg && e.sg !== pf.sg) return false;
       if (pf.q) {
-        const hay = (e.empNo + ' ' + fullName(e) + ' ' + e.position + ' ' + e.nin).toLowerCase();
+        /* the number is searchable as typed on the card AND as stored, so
+     983-1234-5-6-78 and 98312345678 both find the same person */
+        const hay = (e.empNo + ' ' + fullName(e) + ' ' + e.position + ' ' +
+                     e.nin + ' ' + ninPretty(e.nin)).toLowerCase();
         if (hay.indexOf(pf.q.toLowerCase()) === -1) return false;
       }
       return true;
@@ -305,7 +308,7 @@ function renderEmployee(no) {
           kv('Middle names', esc(e.middleNames)) +
           kv('Surname at birth', esc(e.surnameAtBirth)) +
           kv('Initials', esc(e.initials)) +
-          kv('National Identity Number', '<span class="ref">' + esc(e.nin) + '</span>') +
+          kv('National Identity Number', '<span class="ref">' + esc(ninPretty(e.nin)) + '</span>') +
           kv('Passport number', e.passportNo ? '<span class="mono">' + esc(e.passportNo) + '</span>' : '') +
           kv('Date of birth', hrDate(e.dob) + ' <span class="meta">(' + Math.floor((Date.now() - e.dob) / (365.25 * 864e5)) + ')</span>') +
           kv('Gender', esc(e.gender)) +
@@ -328,7 +331,7 @@ function renderEmployee(no) {
         '<div class="facts">' +
           kv('Surname', esc(e.nextOfKin.surname)) +
           kv('First names', esc(e.nextOfKin.firstNames)) +
-          kv('National Identity Number', '<span class="ref">' + esc(e.nextOfKin.nin) + '</span>') +
+          kv('National Identity Number', '<span class="ref">' + esc(ninPretty(e.nextOfKin.nin)) + '</span>') +
           kv('Contact number', esc(e.nextOfKin.phone)) +
           kv('Relationship', esc(e.nextOfKin.relationship)) +
           kv('Address', esc(e.nextOfKin.address)) +
@@ -477,7 +480,7 @@ function appTable(rows) {
       '<tr onclick="location.hash=\'#/hr/a/' + a.id + '\'">' +
       '<td data-label="Reference"><span class="ref">' + esc(a.id) + '</span></td>' +
       '<td data-label="Applicant"><div class="sum">' + esc(a.firstNames + ' ' + a.surname) + '</div>' +
-        '<div class="meta">' + esc(a.title) + ' · ' + esc(a.nin) + '</div></td>' +
+        '<div class="meta">' + esc(a.title) + ' · ' + esc(ninPretty(a.nin)) + '</div></td>' +
       '<td data-label="Position"><div>' + esc(a.positionTitle) + '</div>' +
         '<div class="meta">' + esc(a.positionCode) + '</div></td>' +
       '<td data-label="Section">' + secPill(a.section) + '</td>' +
@@ -533,7 +536,7 @@ function renderApplication(id) {
       '<div class="facts">' +
         kv('Surname', esc(a.surname)) + kv('Title', esc(a.title)) +
         kv('First names', esc(a.firstNames)) + kv('Name normally used', esc(a.knownAs)) +
-        kv('Initials', esc(a.initials)) + kv('National Identity Number', '<span class="ref">' + esc(a.nin) + '</span>') +
+        kv('Initials', esc(a.initials)) + kv('National Identity Number', '<span class="ref">' + esc(ninPretty(a.nin)) + '</span>') +
         kv('Surname at birth', esc(a.surnameAtBirth)) + kv('Date of birth', hrDate(a.dob)) +
         kv('Nationality', esc(a.nationality)) + kv('Country of birth', esc(a.countryOfBirth)) +
         kv('Gender', esc(a.gender)) + kv('Marital status', esc(a.maritalStatus)) +
@@ -562,7 +565,7 @@ function renderApplication(id) {
     formSection(10, 'Next of kin',
       '<div class="facts">' + kv('Surname', esc(a.nextOfKin.surname)) +
       kv('First names', esc(a.nextOfKin.firstNames)) +
-      kv('National Identity Number', '<span class="ref">' + esc(a.nextOfKin.nin) + '</span>') +
+      kv('National Identity Number', '<span class="ref">' + esc(ninPretty(a.nextOfKin.nin)) + '</span>') +
       kv('Contact numbers', esc(a.nextOfKin.phone)) +
       kv('Relationship to applicant', esc(a.nextOfKin.relationship)) +
       kv('Address', esc(a.nextOfKin.address)) + '</div>') +
@@ -716,7 +719,7 @@ function renderApplyForm() {
           TITLES.map(t => '<option>' + t + '</option>').join('') + '</select></label>' +
           '<label><span>Name normally used</span><input id="f_known"></label></div>' +
         '<div class="two"><label><span>National Identity Number</span>' +
-          '<input id="f_nin" inputmode="numeric" placeholder="9 digits"></label>' +
+          '<input id="f_nin" inputmode="numeric" maxlength="15" placeholder="999-9999-9-9-99"></label>' +
           '<label><span>Surname at birth</span><input id="f_surbirth"></label></div>' +
         '<div class="two"><label><span>Date of birth</span><input type="date" id="f_dob"></label>' +
           '<label><span>Gender</span><select id="f_gender"><option>Female</option><option>Male</option></select></label></div>' +
@@ -820,11 +823,19 @@ function fillApplyForm() {
   const d = n => new Date(n).toISOString().slice(0, 10);
   set('f_sur', 'Melanie'); set('f_first', 'Dominic'); set('f_known', 'Dominic');
   set('f_title', 'Mr'); set('f_gender', 'Male');
-  /* The identity number's first six digits ARE the date of birth, and the
-     form checks that. A sample applicant whose own two fields disagree
-     makes the demonstration argue with itself the moment anybody presses
-     save, so the date is fixed and the number is built from it. */
-  set('f_dob', '1994-07-14'); set('f_nin', '140794226');
+  /* The identity number's first three digits ARE the year of birth, and
+     the form checks that. A sample applicant whose own two fields
+     disagree makes the demonstration argue with itself the moment
+     anybody presses save, so the date is fixed and the number agrees
+     with it: 1994 -> 994.
+
+     This pair went out of step for about an hour on 9 September 2026,
+     when the rule moved from nine digits to eleven and this line did
+     not. Pressing 'Fill it in for me' and then 'Submit' - the shortest
+     path through the whole form, and the one anybody demonstrating it
+     takes - produced the form refusing its own sample applicant. Two
+     places generate a number and both have to move together. */
+  set('f_dob', '1994-07-14'); set('f_nin', '994-0714-2-2-68');
   set('f_phone', '2 51 448');
   set('f_addr', '14 Anse aux Pins, Mahé'); set('f_marital', 'Married');
   set('f_avail', d(Date.now() + 21 * 864e5));
@@ -873,20 +884,26 @@ function submitApplication() {
     $('#f_declare').scrollIntoView({ block: 'center' });
     return;
   }
-  /* The identity number encodes the date of birth in its first six
-     digits. Checking that here is the cheapest possible catch for a
-     mistyped one, and it is a rule the registry already applies. */
+  /* Eleven digits, and the first three are the year of birth. Checking
+     that here is the cheapest possible catch for a mistyped number.
+
+     This asked for NINE digits until 9 September 2026 and refused
+     anything else, which meant a real applicant typing their own real
+     identity number was turned away by the form. The length is the hard
+     stop; the year is a question, because somebody born in 2000
+     correctly carries 000 and the person filling the form is better
+     placed than this code to say so. */
   const nin = val('f_nin').replace(/\D/g, '');
-  if (nin.length !== 9) {
-    toast('A National Identity Number is nine digits.', true);
+  if (nin.length !== NIN_DIGITS) {
+    toast('A National Identity Number is ' + NIN_DIGITS + ' digits — ' +
+          nin.length + ' entered.', true);
     stepShowFor($('#f_nin')); $('#f_nin').focus();
     return;
   }
   const dob = new Date(val('f_dob'));
-  const p = n => String(n).padStart(2, '0');
-  const expect = p(dob.getDate()) + p(dob.getMonth() + 1) + p(dob.getFullYear() % 100);
-  if (nin.slice(0, 6) !== expect) {
-    if (!confirm('The identity number starts ' + nin.slice(0, 6) + ', but the date of birth given ' +
+  const expect = String(dob.getFullYear() % 1000).padStart(3, '0');
+  if (nin.slice(0, 3) !== expect) {
+    if (!confirm('The identity number starts ' + nin.slice(0, 3) + ', but the date of birth given ' +
         'would make it start ' + expect + '.\n\nSave it anyway?')) return;
   }
 

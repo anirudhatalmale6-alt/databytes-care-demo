@@ -593,7 +593,7 @@ function renderDiscRecord(id) {
           tonePill(discAction(d.action).name, discAction(d.action).tone) + '</div>' +
         '<div class="kvs">' +
           kv('Employee', e ? empChip(e) : '—') +
-          kv('Identity number', e ? '<span class="mono">' + esc(e.nin) + '</span>' : '—') +
+          kv('Identity number', e ? '<span class="mono">' + esc(ninPretty(e.nin)) + '</span>' : '—') +
           kv('Department', e ? esc(sec(e.section).name) : '—') +
           kv('Position', e ? esc(e.position) : '—') +
           kv('Action', tonePill(discAction(d.action).name, discAction(d.action).tone)) +
@@ -612,7 +612,7 @@ function renderDiscRecord(id) {
         e ? '<div class="idcard">' + empFace(e, 88) +
           '<div><div class="sum">' + esc(fullName(e)) + '</div>' +
           '<div class="meta">' + esc(e.position) + '</div>' +
-          '<div class="meta mono">' + esc(e.nin) + '</div></div></div>' +
+          '<div class="meta mono">' + esc(ninPretty(e.nin)) + '</div></div></div>' +
           '<div class="hint">Everything on this panel came from the identity number. Nothing about ' +
           'the person is retyped onto a disciplinary record.</div>'
         : '<div class="empty">Employee not found.</div>') +
@@ -647,7 +647,7 @@ function renderDiscForm() {
     card('New record', 'form',
       '<div class="frm">' +
         '<label><span>National Identity Number</span>' +
-          '<input id="dn_nin" inputmode="numeric" maxlength="9" placeholder="nine digits" autocomplete="off"></label>' +
+          '<input id="dn_nin" inputmode="numeric" maxlength="15" placeholder="eleven digits, 999-9999-9-9-99" autocomplete="off"></label>' +
         '<div id="dn_found" class="calcbox">Type an identity number to find the employee.</div>' +
         '<label><span>Action</span><select id="dn_act">' +
           selOpts(DISC_ACTIONS, 'verbal', 'id', 'name') + '</select></label>' +
@@ -674,7 +674,7 @@ function renderDiscForm() {
 function discLookup() {
   const nin = fv('dn_nin').replace(/\D/g, '');
   const box = $('#dn_found'), side = $('#dn_side');
-  const hit = nin.length === 9 ? state.hr.employees.find(e => e.nin === nin) : null;
+  const hit = nin.length === NIN_DIGITS ? state.hr.employees.find(e => e.nin === nin) : null;
   if (hit) {
     box.className = 'calcbox ok';
     box.innerHTML = '<b>' + esc(fullName(hit)) + '</b> — ' + esc(hit.empNo) + ', ' +
@@ -692,11 +692,11 @@ function discLookup() {
         kv('Reports to', hit.reportsTo ? empChip(emp(hit.reportsTo)) : '—') +
       '</div>');
   } else {
-    box.className = 'calcbox' + (nin.length === 9 ? ' bad' : '');
-    box.innerHTML = nin.length === 9
+    box.className = 'calcbox' + (nin.length === NIN_DIGITS ? ' bad' : '');
+    box.innerHTML = nin.length === NIN_DIGITS
       ? 'No employee has the identity number ' + esc(nin) + '. A disciplinary record cannot be filed ' +
         'against somebody who is not on the establishment.'
-      : 'Type an identity number to find the employee. ' + nin.length + ' of 9 digits.';
+      : 'Type an identity number to find the employee. ' + nin.length + ' of ' + NIN_DIGITS + ' digits.';
     side.innerHTML = '';
   }
 }
@@ -1104,7 +1104,7 @@ function photoPanel(e) {
   return '<div class="idcard">' + empFace(e, 96) +
     '<div><div class="sum">' + esc(fullName(e)) + '</div>' +
     '<div class="meta">' + esc(e.empNo) + ' · ' + esc(e.position) + '</div>' +
-    '<div class="meta mono">' + esc(e.nin) + '</div>' +
+    '<div class="meta mono">' + esc(ninPretty(e.nin)) + '</div>' +
     '<div style="margin-top:8px"><label class="filebtn">Upload photograph' +
     '<input type="file" accept="image/*" id="ph_file" style="display:none"></label>' +
     (e.photo ? ' <button onclick="removePhoto(\'' + e.empNo + '\')">Remove</button>' : '') +

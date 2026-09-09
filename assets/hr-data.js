@@ -23,7 +23,7 @@
    none of it came from SPTC.
    ================================================================== */
 
-const HR_SEED_VERSION = 4;
+const HR_SEED_VERSION = 5;   /* 5: identity numbers are eleven digits, not nine */
 
 /* --- the form itself ---------------------------------------------
    Section numbers and titles exactly as printed on PM/05, including
@@ -559,15 +559,46 @@ function grade(sg) { return GRADES.find(g => g.sg === sg) || GRADES[0]; }
 function empStatus(id) { return EMP_STATUS.find(s => s.id === id) || EMP_STATUS[0]; }
 function contractName(id) { return (CONTRACTS.find(c => c.id === id) || {}).name || id; }
 
-/* A Seychelles National Identity Number is nine digits and the first
-   six encode the date of birth. Generating it FROM the date of birth
-   rather than at random means the two agree, which is the first thing
-   anybody checking a record would notice. Invented, but consistent. */
+/* A Seychelles National Identity Number is ELEVEN digits, written
+   999-9999-9-9-99, and the first three are the YEAR of birth: 983 is
+   1983, and somebody born in 2000 correctly carries 000.
+
+   This said nine digits until 9 September 2026, and it was wrong. The
+   nine digit rule came from an assumption I made on a different system
+   and never checked. It is settled now, not guessed: the live Home Care
+   register holds 11,771 identity numbers, every one of them eleven
+   digits in this shape, and the year rule holds on 11,003 of them - the
+   exceptions all being people born in 2000.
+
+   It mattered here more than it looks. The field on the discipline
+   screen carried maxlength="9", so anybody at SPTC typing their own
+   identity number into this demonstration would have watched it cut off
+   two digits short and then be told no such employee exists.
+
+   Generating the number FROM the date of birth rather than at random
+   means the two agree, which is the first thing anybody checking a
+   record would notice. Invented, but consistent. */
+const NIN_DIGITS = 11;
+
 function makeNin(dob, rng) {
   const d = new Date(dob);
-  const p = n => String(n).padStart(2, '0');
-  return p(d.getDate()) + p(d.getMonth() + 1) + p(d.getFullYear() % 100) +
-         String(Math.floor(rng() * 900) + 100);
+  const p = (n, w) => String(n).padStart(w, '0');
+  /* year of birth, then eight digits that carry no meaning we know of */
+  return p(d.getFullYear() % 1000, 3) +
+         p(Math.floor(rng() * 10000), 4) +
+         p(Math.floor(rng() * 10), 1) +
+         p(Math.floor(rng() * 10), 1) +
+         p(Math.floor(rng() * 100), 2);
+}
+
+/* 999-9999-9-9-99 - the way it is written on the card, and the way the
+   Home Care register stores it. Display only; the stored value stays
+   digits so that searching for a number typed either way finds it. */
+function ninPretty(nin) {
+  const s = String(nin || '').replace(/\D/g, '');
+  if (s.length !== NIN_DIGITS) return String(nin || '');
+  return s.slice(0, 3) + '-' + s.slice(3, 7) + '-' + s.slice(7, 8) + '-' +
+         s.slice(8, 9) + '-' + s.slice(9);
 }
 
 function buildHrSeed() {

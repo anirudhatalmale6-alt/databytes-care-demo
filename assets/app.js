@@ -225,7 +225,11 @@ function router() {
   /* Two modules share one shell. Which one is showing is derived from the
      address, not held in a variable, so a pasted link always lands in the
      right module with the right menu beside it. */
-  const mod = view === 'hr' ? 'hr' : (view === 'pay' ? 'pay' : 'care');
+  /* 'pay' only counts as a module when its script is present. It is not,
+     in the SPTC build - see the note in index.html - so a stale #/pay
+     bookmark lands on the passenger care desk instead of a blank page. */
+  const hasPay = typeof payRoute === 'function';
+  const mod = view === 'hr' ? 'hr' : (view === 'pay' && hasPay ? 'pay' : 'care');
   document.documentElement.setAttribute('data-mod', mod);
   document.querySelectorAll('#modsw a').forEach(a =>
     a.classList.toggle('on', a.dataset.mod === mod));
@@ -1274,7 +1278,12 @@ function boot() {
      times, and one shared sentinel is how a half-applied upgrade
      happens. `as` is the shoes you are standing in, and it lives on
      state.pay rather than being rebuilt with the runs. */
-  if (!state.pay || !Array.isArray(state.pay.runs) || state.pay.v !== PAY_SEED_VERSION) {
+  /* Guarded on the module being loaded at all. Without the guard this
+     line reads PAY_SEED_VERSION out of a script that is not there and
+     throws before a single screen is drawn - the whole application
+     dark because of a module that was removed. */
+  if (typeof payBuildSeed === 'function' &&
+      (!state.pay || !Array.isArray(state.pay.runs) || state.pay.v !== PAY_SEED_VERSION)) {
     const keepAs = state.pay && state.pay.as;
     state.pay = payBuildSeed();
     if (keepAs) state.pay.as = keepAs;
@@ -1316,6 +1325,16 @@ function boot() {
   applyTheme(state.theme || 'hcis');
   applyBrand(state.brand);
 
+  /* Whoever signed in is who you are. Done after load() so it beats the
+     `me` carried in a stored session from a previous sign-in. */
+  (function applySignedInUser() {
+    const s = typeof loginSession === 'function' && loginSession();
+    if (s && s.staff) { state.me = s.staff; save(); }
+  })();
+
+  const so = $('#signOutBtn');
+  if (so) so.onclick = loginSignOut;
+
   document.querySelectorAll('#roleSeg button').forEach(b => b.onclick = () => {
     state.me = b.dataset.role === 'agent' ? 'u1' : 'u6';
     qf.mine = false; qf.touched = 0;
@@ -1345,4 +1364,6 @@ function boot() {
     else if (!v || v === 'dashboard') { renderDashboard(); paintChrome(); }
   }, 30000);
 }
-document.addEventListener('DOMContentLoaded', boot);
+/* The sign-in screen goes up first and boot() waits behind it. With a
+   session already open this is the same single call it always was. */
+document.addEventListener('DOMContentLoaded', () => loginGate(boot));
