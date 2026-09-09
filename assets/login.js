@@ -21,13 +21,25 @@
    Anybody reading this before a meeting: say that sentence out loud
    rather than letting the screen imply otherwise.
 
-   The background photograph is `assets/login-bg.jpg`. If that file is
-   absent - and today it is, the client is sending one - the panel falls
-   back to a wash in SPTC's own blue and nothing looks broken. Dropping
-   the file in is the whole change; no code moves.
+   The background photograph is `assets/login-bg.jpg` - SPTC's own buses
+   at the terminus, sent by the client on 9 September 2026 and described
+   by him as temporary. If the file is ever absent the panel falls back
+   to a wash in SPTC's own blue and nothing looks broken, so swapping the
+   picture is only ever swapping the file.
    ------------------------------------------------------------------ */
 
 const LOGIN_KEY = 'sptc_demo_session';
+
+/* The live SPTC E-Tickets helpdesk. A real, working site on a real
+   domain - NOT part of this demonstration and not something this code
+   can vouch for, which is why it opens in its own tab rather than
+   pretending to be a screen in here.
+
+   Checked before it was linked: sptc.databytes.sc resolves to
+   41.203.245.191 and answers 200 over HTTPS in under a second. A dead
+   link on the first screen of a sales demonstration is worse than no
+   link at all, so it is worth re-checking if this ever moves. */
+const SPTC_TICKETS_URL = 'https://sptc.databytes.sc/';
 
 /* The four accounts, named by the client on 9 September 2026.
 
@@ -127,10 +139,10 @@ function loginRender(onDone) {
 
   wrap.innerHTML =
     '<div class="si-art">' +
-      '<img id="si_bg" src="assets/login-bg.jpg?v=17" alt="">' +
+      '<img id="si_bg" src="assets/login-bg.jpg?v=18" alt="">' +
       '<div class="si-wash"></div>' +
       '<div class="si-art-in">' +
-        '<span class="si-crest"><img src="assets/sptc-logo.png?v=17" alt="SPTC" width="150" height="150"></span>' +
+        '<span class="si-crest"><img src="assets/sptc-logo.png?v=18" alt="SPTC" width="150" height="150"></span>' +
         '<h1>Seychelles Public Transport Corporation</h1>' +
         '<span class="si-rule"></span>' +
         '<p class="si-sub">Passenger Care and Human Resources</p>' +
@@ -140,6 +152,10 @@ function loginRender(onDone) {
           '<div><b>Human Resources</b><span>The establishment, leave, discipline</span></div>' +
           '<div><b>One establishment</b><span>The same people, whichever module you open</span></div>' +
         '</div>' +
+        '<p class="si-link">' +
+          '<a href="' + SPTC_TICKETS_URL + '" target="_blank" rel="noopener noreferrer">' +
+            'SPTC E-Tickets &mdash; passenger ticketing and support' +
+          '</a></p>' +
         '<p class="si-foot">Prepared by DataBytes Consulting &middot; working demonstration</p>' +
       '</div>' +
     '</div>' +
@@ -147,7 +163,7 @@ function loginRender(onDone) {
     '<div class="si-form">' +
       '<div class="si-card">' +
         '<div class="si-mob">' +
-          '<span class="si-crest sm"><img src="assets/sptc-logo.png?v=17" alt="SPTC" width="150" height="150"></span>' +
+          '<span class="si-crest sm"><img src="assets/sptc-logo.png?v=18" alt="SPTC" width="150" height="150"></span>' +
           '<b>SPTC</b><span>Public Transport</span>' +
         '</div>' +
 
@@ -166,6 +182,9 @@ function loginRender(onDone) {
             '</span></label>' +
           '<button type="submit" class="si-go" id="si_go">Sign in</button>' +
         '</form>' +
+
+        '<p class="si-support">Looking for passenger ticketing or support? ' +
+          '<a href="' + SPTC_TICKETS_URL + '" target="_blank" rel="noopener noreferrer">SPTC E-Tickets</a></p>' +
 
         '<div class="si-demo">' +
           '<button type="button" class="si-toggle" id="si_toggle" aria-expanded="true">' +

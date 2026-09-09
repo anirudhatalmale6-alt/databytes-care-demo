@@ -157,7 +157,7 @@ const STAFF = [
      invented set and stay that way. These four USE the system; those
      51 are sample records inside it.                                */
   { id: 's1', name: 'Alex Etienne',   title: 'GM Corporate',   role: 'exec',       initials: 'AE', available: true, sec: 'care', real: true },
-  { id: 's2', name: 'Stephy Soomery', title: 'IT Supervisor',  role: 'supervisor', initials: 'SS', available: true, sec: 'care', real: true },
+  { id: 's2', name: 'Stephie Soomery', title: 'IT Supervisor', role: 'supervisor', initials: 'SS', available: true, sec: 'care', real: true },
   { id: 's3', name: 'Brenda Julie',   title: 'HR Director',    role: 'head',       initials: 'BJ', available: true, sec: 'crew', real: true },
   { id: 's4', name: 'Evans Delcy',    title: 'Super Admin',    role: 'exec',       initials: 'ED', available: true, sec: 'care', real: true }
 ];
