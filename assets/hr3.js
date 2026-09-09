@@ -138,13 +138,21 @@ function renderNewEmployee() {
         neTwo(neField('Bank name', neSel('ne_bank', BANKS.map(b => b.name), { blank: true })),
               neField('Branch address', neSel('ne_branch', [], { blank: '— choose a bank first —' }))) +
         neField('Account number', '<input id="ne_acc" placeholder="1234 5678 9012">') +
-        neTwo(neField('Basic salary a month (SR)', '<input id="ne_basic" inputmode="numeric">'),
+        neTwo(neField('Basic salary a year (SR)',
+                '<input id="ne_basic" inputmode="numeric" placeholder="124000">' +
+                '<span class="hint">A year, not a month &mdash; the SG grade bands are annual, ' +
+                'and the record shows the monthly figure worked out from it.</span>'),
               neField('Monthly work hours', '<input id="ne_hours" inputmode="decimal" value="' + HOURS_PER_MONTH + '">')) +
         '<label><span>Allowances</span><div class="checks" id="ne_allow">' +
+          /* Three of these are a PERCENTAGE of basic pay, not a number of
+             rupees. Printing "Scarce skills 10" next to "Housing 2,500"
+             invites somebody to read 10 rupees, so the unit is on every
+             one of them. */
           ALLOWANCES.map((a, i) =>
-            '<label class="chk"><input type="checkbox" id="ne_al' + i + '" data-amt="' + a.amount +
-            '" data-name="' + esc(a.name) + '"><span>' + esc(a.name) +
-            ' <b class="mono">' + a.amount.toLocaleString() + '</b></span></label>').join('') +
+            '<label class="chk"><input type="checkbox" id="ne_al' + i + '" data-id="' + esc(a.id) + '">' +
+            '<span>' + esc(a.name) + ' <b class="mono">' +
+            (a.kind === 'pct' ? a.amount + '% of basic' : 'SR ' + a.amount.toLocaleString() + ' a month') +
+            '</b></span></label>').join('') +
         '</div></label>' +
         '<div id="ne_pay" class="calcbox">Enter a basic salary and the gross and the hourly ' +
           'rate are worked out here.</div>' +
@@ -198,29 +206,58 @@ function renderNewEmployee() {
 
 function neVal(id) { const e = $('#' + id); return e ? String(e.value || '').trim() : ''; }
 
+/* Stored the way the register stores them - an id, and nothing else.
+   payBreakdown() resolves the id against ALLOWANCES and works out what a
+   percentage one is worth. Storing {name, amount} instead, which is what
+   this did first, left payBreakdown unable to find the definition: the
+   payslip showed the allowance as worth nothing at all. */
 function neAllowances() {
   return ALLOWANCES.map((a, i) => ({ el: $('#ne_al' + i), a }))
     .filter(x => x.el && x.el.checked)
-    .map(x => ({ name: x.a.name, amount: x.a.amount }));
+    .map(x => ({ id: x.a.id }));
+}
+
+/* The provisional employee, good enough for payBreakdown() and nothing
+   else. The point is that the figures on this form come out of the SAME
+   function the record and the payslip use - three implementations of one
+   sum is how a form and a record come to disagree. */
+function neProvisional() {
+  return {
+    salary: +neVal('ne_basic').replace(/[^\d.]/g, '') || 0,
+    hoursPerMonth: +neVal('ne_hours').replace(/[^\d.]/g, '') || HOURS_PER_MONTH,
+    allowances: neAllowances()
+  };
 }
 
 function nePaint() {
-  /* pay */
-  const basic = +neVal('ne_basic').replace(/[^\d.]/g, '') || 0;
-  const hours = +neVal('ne_hours').replace(/[^\d.]/g, '') || HOURS_PER_MONTH;
-  const allow = neAllowances();
-  const allowTotal = allow.reduce((n, a) => n + a.amount, 0);
-  const gross = basic + allowTotal;
+  const annual = +neVal('ne_basic').replace(/[^\d.]/g, '') || 0;
   const box = $('#ne_pay');
   if (box) {
-    box.innerHTML = basic
-      ? 'Basic <b class="mono">' + basic.toLocaleString() + '</b>' +
-        ' + allowances <b class="mono">' + allowTotal.toLocaleString() + '</b>' +
-        ' = gross <b class="mono">' + gross.toLocaleString() + '</b> a month.' +
-        '<br>Hourly rate <b class="mono">' + (basic / (hours || 1)).toFixed(2) + '</b>' +
-        ' — basic divided by ' + hours + ' hours.' +
-        (allow.length ? '<br><span class="hint">' + allow.map(a => esc(a.name)).join(', ') + '</span>' : '')
-      : 'Enter a basic salary and the gross and the hourly rate are worked out here.';
+    if (!annual) {
+      box.className = 'calcbox';
+      box.textContent = 'Enter a basic salary and the gross and the hourly rate are worked out here.';
+    } else {
+      const p = payBreakdown(neProvisional());
+      const lines = p.lines.map(l => esc(l.name) +
+        (l.kind === 'pct' ? ' (' + l.rate + '% of basic)' : '') +
+        ' <b class="mono">' + l.amount.toLocaleString() + '</b>').join(' &middot; ');
+      /* out-of-band is a question, not an error - acting up and red-circled
+         salaries are both real, and the person typing knows which it is */
+      const pos = (state.hr.positions || []).find(x => x.code === neVal('ne_pos'));
+      const g = pos ? grade(pos.sg) : null;
+      const out = g && (annual < g.min || annual > g.max);
+      box.className = 'calcbox' + (out ? ' bad' : '');
+      box.innerHTML =
+        'Basic <b class="mono">' + p.basic.toLocaleString() + '</b> a month' +
+        ' (<b class="mono">' + annual.toLocaleString() + '</b> a year)' +
+        ' + allowances <b class="mono">' + p.allowances.toLocaleString() + '</b>' +
+        ' = gross <b class="mono">' + p.gross.toLocaleString() + '</b> a month.' +
+        '<br>Hourly rate <b class="mono">' + p.rate.toFixed(2) + '</b>' +
+        ' — monthly basic divided by ' + p.hours + ' hours.' +
+        (lines ? '<br><span class="hint">' + lines + '</span>' : '') +
+        (out ? '<br><b>Outside the ' + esc(g.sg) + ' band</b> (' + g.min.toLocaleString() +
+               ' to ' + g.max.toLocaleString() + ' a year). That may be deliberate.' : '');
+    }
   }
 
   /* leave: the same rule the register already uses — 21 days, plus one
@@ -290,6 +327,7 @@ function neFillPosCode() {
   const code = neVal('ne_pos');
   const box = $('#ne_poscode');
   if (box) box.value = code || '';
+  nePaint();   /* the grade band depends on the position */
 }
 
 /* Held between choosing the file and pressing save. */
@@ -435,7 +473,9 @@ function submitNewEmployee() {
   if (!need('ne_joined', 'A joining date is needed. Service and leave are counted from it.')) return;
 
   const pos = (state.hr.positions || []).find(p => p.code === neVal('ne_pos'));
-  const basic = +neVal('ne_basic').replace(/[^\d.]/g, '') || 0;
+  /* annual, like every other salary in the register - payBreakdown()
+     divides it by twelve */
+  const annual = +neVal('ne_basic').replace(/[^\d.]/g, '') || 0;
   const hours = +neVal('ne_hours').replace(/[^\d.]/g, '') || HOURS_PER_MONTH;
   const joined = new Date(neVal('ne_joined')).getTime();
   const years = Math.max(0, (Date.now() - joined) / (365.25 * 864e5));
@@ -493,7 +533,7 @@ function submitNewEmployee() {
     dutyType: neVal('ne_duty'),
     isHead: pos ? !!pos.head : false,
     sg: pos ? pos.sg : 'SG7',
-    salary: basic,
+    salary: annual,
     hoursPerMonth: hours,
     allowances: neAllowances(),
     medicalBenefit: neVal('ne_med') === 'Yes',
@@ -567,7 +607,8 @@ function fillNewEmployee() {
 
   set('ne_bank', BANKS[0].name); neFillBranches();
   set('ne_acc', '4021 7788 1140');
-  set('ne_basic', '11400'); set('ne_hours', String(HOURS_PER_MONTH));
+  set('ne_basic', '124000');   /* a year, inside the SG7 band */
+  set('ne_hours', String(HOURS_PER_MONTH));
   const al = $('#ne_al0'); if (al) al.checked = true;
   set('ne_med', 'Yes'); set('ne_medscheme', (MEDICAL_SCHEMES[0].name || MEDICAL_SCHEMES[0]));
 
