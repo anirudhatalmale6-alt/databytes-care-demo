@@ -26,9 +26,11 @@
        wrong - it is eleven - so it would contradict the HR module
        standing next to it.
 
-       assets/pay.js is still in the repository. Putting it back is this
-       block, the nav set below, and the script tag at the foot of the
-       page. Nothing else knows about it. -->
+       The file is deleted rather than merely unloaded. Leaving it in
+       place would have served it on request - not linked from anywhere,
+       but a plain 200 to anybody who asked for /assets/pay.js, which is
+       not the same thing as gone. It is in the git history at e0008f6
+       if it is ever wanted, and the working version lives in HCIS. -->
 
   <aside class="rail">
     <div class="brand">
