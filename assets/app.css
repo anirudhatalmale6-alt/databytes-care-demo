@@ -462,7 +462,12 @@ textarea:focus,.frm input:focus,.frm select:focus{border-color:var(--brand);back
   --sc-care:#1d6fd0; --sc-ops:#b57108; --sc-crew:#6a51d8; --sc-fleet:#0a6f91;
   --sc-infra:#0d8f6c; --sc-fin:#b0468a; --sc-safety:#d13c33;
 }
-.secpill{display:inline-block;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+/* --sc defaults here so a department added after the build still gets a
+   readable pill. Without it color-mix(var(--sc)...) has nothing to work
+   with and the pill renders as unstyled text. The seven seeded sections
+   override it below. */
+.secpill{--sc:var(--dim);
+  display:inline-block;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
   font-weight:700;padding:2px 6px;border-radius:2px;vertical-align:middle;white-space:nowrap;
   background:color-mix(in srgb,var(--sc) 16%,transparent);color:var(--sc);
   border:1px solid color-mix(in srgb,var(--sc) 34%,transparent)}

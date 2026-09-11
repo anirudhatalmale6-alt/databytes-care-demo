@@ -139,10 +139,10 @@ function loginRender(onDone) {
 
   wrap.innerHTML =
     '<div class="si-art">' +
-      '<img id="si_bg" src="assets/login-bg.jpg?v=19" alt="">' +
+      '<img id="si_bg" src="assets/login-bg.jpg?v=20" alt="">' +
       '<div class="si-wash"></div>' +
       '<div class="si-art-in">' +
-        '<span class="si-crest"><img src="assets/sptc-logo.png?v=19" alt="SPTC" width="150" height="150"></span>' +
+        '<span class="si-crest"><img src="assets/sptc-logo.png?v=20" alt="SPTC" width="150" height="150"></span>' +
         '<h1>Seychelles Public Transport Corporation</h1>' +
         '<span class="si-rule"></span>' +
         '<p class="si-sub">Passenger Care and Human Resources</p>' +
@@ -163,7 +163,7 @@ function loginRender(onDone) {
     '<div class="si-form">' +
       '<div class="si-card">' +
         '<div class="si-mob">' +
-          '<span class="si-crest sm"><img src="assets/sptc-logo.png?v=19" alt="SPTC" width="150" height="150"></span>' +
+          '<span class="si-crest sm"><img src="assets/sptc-logo.png?v=20" alt="SPTC" width="150" height="150"></span>' +
           '<b>SPTC</b><span>Public Transport</span>' +
         '</div>' +
 

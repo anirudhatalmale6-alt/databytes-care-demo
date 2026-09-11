@@ -950,6 +950,24 @@ function renderTables() {
     'and it stops being offered when a case is routed — without breaking the cases already in it.</div>' +
 
     card('Departments', D.filter(d => d.active).length + ' open of ' + D.length,
+      /* Positions could be added here from the start and departments could
+         only be opened and closed, which was an oversight rather than a
+         decision - the two tables are maintained by the same person on the
+         same screen. It matters now: SPTC's real department list is coming,
+         and this is what lets it be typed in without waiting for a build. */
+      '<div class="frm" style="padding:12px 14px 0">' +
+        '<div class="three">' +
+          '<label><span>New department</span><input id="dp_name" placeholder="e.g. Procurement"></label>' +
+          '<label><span>Short name</span><input id="dp_short" placeholder="shown on the pill"></label>' +
+          '<label><span>Head of department</span><select id="dp_head">' +
+            '<option value="">— nobody yet —</option>' +
+            STAFF.filter(x => x.role !== 'agent').map(x =>
+              '<option value="' + esc(x.id) + '">' + esc(x.name) + '</option>').join('') +
+          '</select></label>' +
+        '</div>' +
+        '<div class="btnrow" style="margin:0 0 12px">' +
+          '<button class="primary" onclick="addDepartment()">Add the department</button></div>' +
+      '</div>' +
       '<table class="tbl"><thead><tr><th>Code</th><th>Department</th><th>Head</th>' +
       '<th style="text-align:right">People</th><th style="text-align:right">Open cases</th>' +
       '<th>Status</th><th></th></tr></thead><tbody>' +
@@ -1008,6 +1026,38 @@ function renderTables() {
       'the table is right for any year without anybody remembering to extend it. <b>The fixed dates ' +
       'are my list, not a gazette</b> — confirm them against the published notice before a balance is ' +
       'relied on.</div>', true);
+}
+
+function addDepartment() {
+  const name = fv('dp_name');
+  if (!name) { toast('A department needs a name.', true); return; }
+  const D = allDepartments();
+  if (D.some(d => d.name.toLowerCase() === name.toLowerCase())) {
+    toast('There is already a department called that.', true); return;
+  }
+
+  /* The id is what employees, cases and positions are all stored against,
+     so it has to be unique and it has to survive. Derived from the name,
+     then made unique - never reused, because re-using a retired id would
+     silently re-adopt the records that pointed at it. */
+  const stem = name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 8) || 'dept';
+  let id = stem, n = 1;
+  while (D.some(d => d.id === id)) id = stem + (++n);
+
+  let code = 'D' + String(10 + D.length), c = D.length;
+  while (D.some(d => d.code === code)) code = 'D' + String(10 + (++c));
+
+  D.push({
+    id, name, code, active: true,
+    short: fv('dp_short') || name.split(/\s+/)[0],
+    head: fv('dp_head') || null,
+    what: '',
+    fromSeed: false
+  });
+  if (!state.hr.departments) state.hr.departments = D;
+  save();
+  toast(name + ' added as ' + code + '.');
+  renderTables();
 }
 
 function toggleDept(id) {
